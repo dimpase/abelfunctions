@@ -1,8 +1,9 @@
 import abelfunctions
-import sympy
 import unittest
 
-from sympy.abc import x,y
+from sage.rings.rational_field import QQ
+R = QQ['x,y']
+x,y = R.gens()
 
 class AbelfunctionsTestCase(unittest.TestCase):
     def setUp(self):
@@ -25,14 +26,14 @@ class AbelfunctionsTestCase(unittest.TestCase):
         self.monicf = [self.f2, self.f4, self.f5, self.f6, self.f7, self.f9]
         self.nonmonicf = [self.f1, self.f3, self.f8, self.f10]
 
-    @classmethod
-    def setUpClass(cls):
-        cls.f2 = -x**7 + 2*x**3*y + y**3
-        cls.X2 = abelfunctions.RiemannSurface(cls.f2,x,y)
+    # @classmethod
+    # def setUpClass(cls):
+    #     cls.f2 = -x**7 + 2*x**3*y + y**3
+    #     cls.X2 = abelfunctions.RiemannSurface(cls.f2,x,y)
 
-        cls.f11 = x**2*y**3 - x**4 + 1
-        cls.X11 = abelfunctions.RiemannSurface(cls.f11,x,y)
+    #     cls.f11 = x**2*y**3 - x**4 + 1
+    #     cls.X11 = abelfunctions.RiemannSurface(cls.f11,x,y)
 
-        cls.f12 = x**2*y**3 - y*x**4 + 1
-        cls.X12 = abelfunctions.RiemannSurface(cls.f12,x,y)
+    #     cls.f12 = x**2*y**3 - y*x**4 + 1
+    #     cls.X12 = abelfunctions.RiemannSurface(cls.f12,x,y)
 

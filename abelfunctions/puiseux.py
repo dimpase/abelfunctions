@@ -18,6 +18,8 @@ Functions
 .. autosummary::
 
     puiseux
+    newton_iteration
+    newton_iteration_step
 
 References
 ----------
@@ -39,23 +41,35 @@ Contents
 import numpy
 import sympy
 
-from abelfunctions.utilities import rootofsimp, cached_function
 from operator import itemgetter
 from sympy import ( degree, Point, Segment, Poly, poly, Rational, Dummy,
                     RootOf, gcd, gcdex, LC, expand, cancel, simplify, ratsimp)
 
+rootofsimp = lambda x: x
 
-import pdb
+from sage.all import I, pi
+from sage.functions.log import log, exp
+from sage.functions.other import ceil
+from sage.rings.arith import gcd, xgcd
+from sage.rings.big_oh import O
+from sage.rings.infinity import infinity
+from sage.rings.integer_ring import ZZ
+from sage.rings.laurent_series_ring import LaurentSeriesRing
+from sage.rings.laurent_series_ring_element import LaurentSeries
+from sage.rings.polynomial.laurent_polynomial_ring import LaurentPolynomialRing
+from sage.rings.qqbar import QQbar
+from sage.rings.rational_field import QQ
+from sage.structure.element import AlgebraElement
 
-_z = sympy.Symbol('_z')
 
-
-def newton_polygon_exceptional(H,x,y):
+def newton_polygon_exceptional(H):
     r"""Computes the exceptional Newton polygon of `H`."""
-    d = degree(H.eval(x,0), y)
+    R = H.parent()
+    x,y = R.gens()
+    d = H(x=0).degree(y)
     return [[(0,0),(d,0)]]
 
-def newton_polygon(H,x,y,additional_points=[]):
+def newton_polygon(H, additional_points=[]):
     r"""Computes the Newton polygon of `H`.
 
     It's assumed that the first generator of `H` here is the "dependent
@@ -67,15 +81,9 @@ def newton_polygon(H,x,y,additional_points=[]):
 
         a_{ij} x^j y^i.
 
-
     Parameters
     ----------
-    H : sympy.Poly
-        Polynomial in `x` and `y`.
-    x : sympy.Symbol
-        Dependent variable.
-    y : sympy.Symbol
-        Independent variable.
+    H : bivariate polynomial
 
     Returns
     -------
@@ -83,12 +91,23 @@ def newton_polygon(H,x,y,additional_points=[]):
         Returns a list where each element is a list, representing a side
         of the polygon, which in turn contains tuples representing the
         points on the side.
+
+    Note
+    ----
+    This is written using Sympy's convex hull algorithm for legacy purposes. It
+    can certainly be rewritten to use Sage's Polytope but do so *very
+    carefully*! There are a number of subtle things going on here due to the
+    fact that boundary points are ignored.
+
     """
     # because of the way sympy.convex_hull computes the convex hull we
     # need to remove all points of the form (0,j) and (i,0) where j > j0
     # and i > i0, the points on the axes closest to the origin
-    H = H.as_poly(y,x)
-    support = map(Point, H.monoms()) + additional_points
+    R = H.parent()
+    x,y = R.gens()
+    monomials = H.monomials()
+    points = map(lambda monom: (monom.degree(y), monom.degree(x)), monomials)
+    support = map(Point, points) + additional_points
     i0 = min(P.x for P in support if P.y == 0)
     j0 = min(P.y for P in support if P.x == 0)
     support = filter(lambda P: (P.x <= i0) and (P.y <= j0), support)
@@ -111,13 +130,13 @@ def newton_polygon(H,x,y,additional_points=[]):
         first_side = generalized_polygon_side(sides[0])
         if first_side != sides[0]:
             P = first_side.p1
-            return newton_polygon(H,x,y,additional_points=[P])
+            return newton_polygon(H,additional_points=[P])
 
     # convert the sides to lists of points
     polygon = []
     for side in sides:
         polygon_side = [P for P in support if P in side]
-        polygon_side = sorted(map(lambda P: (P.x,P.y), polygon_side))
+        polygon_side = sorted(map(lambda P: (int(P.x),int(P.y)), polygon_side))
         polygon.append(polygon_side)
 
         # stop the moment we hit the i-axis. despite the filtration at
@@ -164,10 +183,10 @@ def bezout(q,m):
     """
     if q == 1:
         return (1,0)
-    u,v,g = gcdex(q,-m)
+    g,u,v = xgcd(q,-m)
     return (u,v)
 
-def transform_newton_polynomial(H,x,y,q,m,l,xi):
+def transform_newton_polynomial(H, q, m, l, xi):
     r"""Recenters a Newton polynomial at a given singular term.
 
     Given the Puiseux data :math:`x=\mu x^q, y=x^m(\beta+y)` this
@@ -178,37 +197,34 @@ def transform_newton_polynomial(H,x,y,q,m,l,xi):
         \tilde{H} = H(\xi^v x^q, x^m(\xi^u+y)) / x^l.
 
     where :math:`uq+mv=1`.
+
+    Parameters
+    ----------
+    H : polynomial in `x` and `y`
+    q, m, l, xi : constants
+        See above for the definitions of these parameters.
+
+    Returns
+    -------
+    polynomial
     """
+    R = H.parent()
+    x,y = R.gens()
+
     u,v = bezout(q,m)
-    newx = rootofsimp((xi**v)*(x**q)).as_poly(x)
-    newy = rootofsimp((x**m)*(xi**u + y)).as_poly(y)
-    quo = x**l
+    newx = (xi**v)*(x**q)
+    newy = (x**m)*(xi**u + y)
+    newH = H.subs({x:newx,y:newy})
 
-    # RootOfs in H are not preserved under the transformation. (that is,
-    # actual algebraic representations are calculated.) each RootOf is
-    # temporarily replaced by a dummy variable
-    H = rootofsimp(H)
-    rootofs = H.find(RootOf)
-    rootofs = rootofs.union(newx.find(RootOf))
-    rootofs = rootofs.union(newy.find(RootOf))
-    dummies = [sympy.Dummy() for _ in rootofs]
-    transform = dict(zip(rootofs,dummies))
-
-    # replace all instances of RootOf with dummy variables
-    H = H.xreplace(transform)
-    newx = newx.xreplace(transform).as_poly(x)
-    newy = newy.xreplace(transform).as_poly(y)
-
-    # perform the transformation
-    newH = H.as_poly(x).compose(newx).as_poly(y).compose(newy)
-    newH = newH.exquo(quo).as_poly(x,y)
-
-    # place the rootofs back in place of the dummy varaiables
-    transform = dict(zip(dummies,rootofs))
-    newH = rootofsimp(newH.xreplace(transform))
+    # divide by x**l
+    R = newH.parent()
+    x,y = R.gens()
+    exponents, coefficients = zip(*(newH.dict().items()))
+    exponents = map(lambda e: (e[0]-l, e[1]), exponents)
+    newH = R(dict(zip(exponents, coefficients)))
     return newH
 
-def newton_data(H,x,y,exceptional=False):
+def newton_data(H, exceptional=False):
     r"""Determines the "newton data" associated with each side of the polygon.
 
     For each side :math:`\Delta` of the Newton polygon of `H` we
@@ -233,43 +249,47 @@ def newton_data(H,x,y,exceptional=False):
     list
         A list of the tuples :math:`(q,m,l,\phi)`.
     """
-    H = H.as_poly(y,x)
-    if exceptional:
-        newton = newton_polygon_exceptional(H,x,y)
-    else:
-        newton = newton_polygon(H,x,y)
+    R = H.parent()
+    x,y = R.gens()
 
-    # special case when the newton polygon is a point
+    if exceptional:
+        newton = newton_polygon_exceptional(H)
+    else:
+        newton = newton_polygon(H)
+
+    # special case when the newton polygon is a single point
     if len(newton[0]) == 1:
         return []
 
+    # for each side dtermine the corresponding newton data: side slope
+    # information and corresponding side characteristic polynomial, phi
     result = []
     for side in newton:
         i0,j0 = side[0]
         i1,j1 = side[1]
-        slope = Rational(j1-j0,i1-i0)
-        q = slope.q
-        m = -slope.p
+        slope = QQ(j1-j0)/QQ(i1-i0)
+        q = slope.denom()
+        m = -slope.numer()
         l = min(q*j0 + m*i0, q*j1 + m*i1)
-        phi = sum(H.coeff_monomial((i,j))*_z**Rational(i-i0,q) for i,j in side)
-        phi = phi.as_poly(_z)
+        phi = sum(H.coefficient({y:i,x:j})*x**((i-i0)/q) for i,j in side)
+        phi = phi.univariate_polynomial()
         result.append((q,m,l,phi))
     return result
 
 
-def newton_iteration(G,t,y,n):
-    r"""Returns a truncated series `y = y(t)` satisfying
+def newton_iteration(G, n):
+    r"""Returns a truncated series `y = y(x)` satisfying
 
     .. math::
 
-        G(t,y(t)) \equiv 0 \bmod{t^r}
+        G(x,y(x)) \equiv 0 \bmod{x^r}
 
     where $r = \ceil{\log_2{n}}$. Based on the algorithm in [XXX].
 
     Parameters
     ----------
-    G : sympy.Poly
-        A polynomial in `t` and `y`.
+    G, x, y : polynomial
+        A polynomial in `x` and `y`.
     n : int
         Requested degree of the series expansion.
 
@@ -279,31 +299,31 @@ def newton_iteration(G,t,y,n):
     choice of order below :math:`2^r` will return the same series.
 
     """
+    R = G.parent()
+    x,y = R.gens()
     if n < 0:
         raise ValueError('Number of terms must be positive. (n=%d'%n)
     elif n == 0:
-        return sympy.S(0)
+        return R(0)
 
-    phi = G.as_poly(y)
-    phiprime = phi.diff(y).as_poly(y)
-
+    phi = G
+    phiprime = phi.derivative(y)
     try:
-        pi = Poly(t,t)
-        gi = Poly(0,y)
-        si = phiprime.compose(gi).as_poly(t).invert(pi)
-    except sympy.NotInvertible:
+        pi = R(x).polynomial(x)
+        gi = R(0)
+        si = R(phiprime(y=gi)).polynomial(x).inverse_mod(pi)
+    except NotImplementedError:
         raise ValueError('Newton iteration for computing regular part of '
-                         'Puiseux expansion failed. Curve is not regular '
-                         'at center.')
+                         'Puiseux expansion failed. Curve is most likely '
+                         'not regular at center.')
 
-    r = sympy.ceiling(sympy.log(n,2))
+    r = ceil(log(n,2))
     for i in range(r):
-        gi,si,pi = newton_iteration_step(phi,phiprime,gi,si,pi,t,y)
+        gi,si,pi = newton_iteration_step(phi,phiprime,gi,si,pi)
+    return R(gi)
 
-    return gi.as_expr()
 
-
-def newton_iteration_step(phi,phiprime,g,s,p,t,y):
+def newton_iteration_step(phi, phiprime, g, s, p):
     r"""Perform a single step of the newton iteration algorithm.
 
     Parameters
@@ -315,7 +335,7 @@ def newton_iteration_step(phi,phiprime,g,s,p,t,y):
     p : sympy.Poly
         The current modulus. That is, `g` is the Taylor series solution
         to `phi(t,g) = 0` modulo `p`.
-    t,y : sympy.Symbol
+    x,y : sympy.Symbol
         Dependent and independent variables, respectively.
 
     Returns
@@ -323,37 +343,25 @@ def newton_iteration_step(phi,phiprime,g,s,p,t,y):
     gnext,snext,pnext
 
     """
-    # rootofs are destroyed in the below calculations. temporarily
-    # replace them all with dummy variables
-    rootofs = phi.find(RootOf).union(g.find(RootOf)).union(s.find(RootOf))
-    dummies = [sympy.Dummy() for _ in rootofs]
+    R = phi.parent()
+    x,y = R.gens()
+    g = R(g).univariate_polynomial()
+    s = R(s).univariate_polynomial()
+    p = R(p).univariate_polynomial()
 
-    transform = dict(zip(rootofs,dummies))
-    phi = phi.xreplace(transform).as_poly(y)
-    phiprime = phiprime.xreplace(transform).as_poly(y)
-    g = g.xreplace(transform).as_poly(y)
-    s = s.xreplace(transform).as_poly(t)
-    p = p.as_poly(t)
+    pnext = p**2
+    gnext = g - phi(y=g).univariate_polynomial()*s
+    gnext = gnext % pnext
+    snext = 2*s - phiprime(y=gnext).univariate_polynomial()*s**2
+    snext = snext % pnext
 
-    # compute the next g and s
-    deg = p.degree()
-    pnext = Poly(t**(2*deg),t)
-    gnext = g.as_poly(t) - phi.compose(g).as_poly(t)*s
-    gnext = (gnext % pnext).as_poly(y)
-    snext = 2*s - phiprime.compose(gnext).as_poly(t)*s**2
-    snext = (snext % pnext).as_poly(t)
-
-    # transform back and simplify
-    transform = dict(zip(dummies,rootofs))
-    gnext = gnext.xreplace(transform)
-    snext = snext.xreplace(transform)
-
-    gnext = rootofsimp(gnext).as_poly(y)
-    snext = rootofsimp(snext).as_poly(t)
+    gnext = R(gnext)
+    snext = R(snext)
+    pnext = R(pnext)
     return gnext,snext,pnext
 
 
-def puiseux_rational(H,x,y,recurse=False):
+def puiseux_rational(H, recurse=False):
     r"""Puiseux data for the curve :math:`H` above :math:`(x,y)=(0,0)`.
 
     Given a polynomial :math:`H = H(x,y)` :func:`puiseux_rational`
@@ -362,7 +370,7 @@ def puiseux_rational(H,x,y,recurse=False):
 
     Parameters
     ----------
-    H : sympy.Poly
+    H : polynomial
         A plane curve in `x` and `y`.
     recurse : boolean
         (Default: `True`) A flag used internally to keep track of which
@@ -376,58 +384,34 @@ def puiseux_rational(H,x,y,recurse=False):
         :func:`newton_iteration` to generate additional terms in the
         y-series.
     """
-    H = H.as_poly(x,y)
-    R = []
+    R = H.parent()
+    x,y = R.gens()
 
     # when recurse is true, return if the leading order of H(0,y) is y
     if recurse:
-        IH = H.subs(x,0).as_expr().leadterm(y)[1]
+        IH = H(x=0).polynomial(y).ord()
         if IH == 1:
             return [(H,x,y)]
 
     # for each newton polygon side branch out a new puiseux series
-    data = newton_data(H,x,y,exceptional=(not recurse))
-    R = []
+    data = newton_data(H, exceptional=(not recurse))
+    singular_terms = []
     for q,m,l,phi in data:
         u,v = bezout(q,m)
-        for psi,k in phi.factor_list()[1]:
-            _z = psi.gen
-            psisimp = rootofsimp(psi)
-
-            # try to compute the roots in terms
-            try:
-                roots = psisimp.as_poly(_z).all_roots(multiple=False,
-                                                      radicals=False)
-                roots = roots.keys()
-            except:
-                pass
-
-            # RootOfs still appear in the expression then temporarily replace
-            # them with dummies and compute radical roots. this is done to
-            # prevent automatic removal of the "radicals=False" requirement
-            try:
-                rootofs = psisimp.find(RootOf)
-                dummies = [Dummy() for _ in rootofs]
-                transform = dict(zip(rootofs,dummies))
-                _psisimp = psisimp.xreplace(transform)
-                roots = sympy.roots(_psisimp, _z).keys()
-                transform = dict(zip(dummies,rootofs))
-                roots = map(lambda xi: xi.xreplace(transform), roots)
-            except NotImplementedError:
-                raise NotImplementedError(
-                    'Cannot construct puiseux series expansions of %s at '
-                    '%s=%s: Sympy does not support computing roots of '
-                    'polynomials with non-rational coefficients.'%(f,x,alpha))
-
+        for psi,k in phi.squarefree_decomposition():
+            roots = psi.roots(ring=QQbar, multiplicities=False)
+            map(lambda x: x.exactify(), roots)
             for xi in roots:
-                Hprime = transform_newton_polynomial(H,x,y,q,m,l,xi)
-                for (G,P,Q) in puiseux_rational(Hprime,x,y,recurse=True):
+                Hprime = transform_newton_polynomial(H, q, m, l, xi)
+                next_terms = puiseux_rational(Hprime, recurse=True)
+                for (G,P,Q) in next_terms:
                     singular_term = (G, xi**v*P**q, P**m*(xi**u + Q))
-                    R.append(singular_term)
-    return R
+                    singular_terms.append(singular_term)
+
+    return singular_terms
 
 
-def almost_monicize(f,x,y):
+def almost_monicize(f):
     r"""Transform `f` to an "almost monic" polynomial.
 
     Perform a sequence of substitutions of the form
@@ -450,109 +434,96 @@ def almost_monicize(f,x,y):
         A new, almost monic polynomial `g` and a polynomial `transform`
         such that `y -> y/transform`.
     """
-    f = f.expand().as_expr()
-    transform = sympy.S(1)
+    R = f.parent()
+    x,y = R.gens()
+    transform = R(1)
     monic = False
-    while not monic:
-        if LC(f,y).subs(x,0) == 0:
-            fsubs = f.subs(y,y/x).expand()
-            n,d = fsubs.together().as_numer_denom()
-            f = n.expand()
-            transform *= x
-        else:
-            monic = True
-    return f,transform
+    while f.polynomial(y).leading_coefficient()(x=0) == 0:
+        r = f(y=y/x)
+        n = r.numerator()
+        d = r.denominator()
+        f = R(n)
+        transform *= x
+    return f, transform
 
 
-def puiseux(f,x,y,alpha,beta=None,t=sympy.Symbol('t'),
-            order=None,exact=True,parametric=True):
+def puiseux(f, alpha, beta=None, order=None, parametric=True):
     r"""Singular parts of the Puiseux series above :math:`x=\alpha`.
 
     Parameters
     ----------
-    f : sympy.Expr
+    f : polynomial
         A plane algebraic curve in `x` and `y`.
     alpha : complex
         The x-point over which to compute the Puiseux series of `f`.
+    t : variable
+        Variable used in the Puiseux series expansions.
     beta : complex
         (Optional) The y-point at which to compute the Puiseux series.
-    t : sympy.Symbol
-        (Optional) Variable used in the Puiseux series expansions.
     order : int
         (Default: `None`) If provided, returns Puiseux series expansions
         up the the specified order.
-    exact : boolean
-        (Default: `True`) If False, coerce results into numerical
-        coefficients.
-
 
     Returns
     -------
     list of PuiseuxTSeries
 
     """
-    infinities = [sympy.oo, numpy.Inf, 'oo']
-    singular = []
+    R = f.parent()
+    x,y = R.gens()
 
-    # recenter the curve in x with the given alpha
-    if alpha in infinities:
-        alpha = sympy.oo
-        d = degree(f,x)
-        fa = expand(f.subs(x,1/x) * x**d)
+    # recenter the curve at x=alpha
+    if alpha in [infinity,'oo']:
+        alpha = infinity
+        d = f.degree(x)
+        F = f(x=1/x)*x**d
+        n,d = F.numerator(), F.denominator()
+        falpha,_ = n.polynomial(x).quo_rem(d.univariate_polynomial())
+        falpha = R(falpha)
     else:
-        fa = expand(f.subs(x,x+alpha))
+        falpha = f(x=x+alpha)
 
-    # recenter the curve in y. if the curve is not monic, monicize and
-    # perform the reverse transformation in the series construction step
-    g,transform = almost_monicize(fa,x,y)
-    _y = sympy.Symbol('_'+str(y))
-    gx0y = rootofsimp(g.subs(x,0))
-    gx0y = gx0y.subs(y,_y).as_poly(_y)
-    try:
-        all_roots = gx0y.all_roots(radicals=False,multiple=False)
-        roots,multiplicities = zip(*all_roots)
-    except:
-        raise NotImplementedError(
-            'Cannot construct puiseux series expansions of %s at '
-            '%s=%s: Sympy does not support computing roots of '
-            'polynomials with non-rational coefficients.'%(f,x,alpha))
+    # determine the points on the curve lying above x=alpha
+    g, transform = almost_monicize(falpha)
+    galpha = g(x=0).univariate_polynomial()
+    betas = galpha.roots(ring=QQbar, multiplicities=False)
+    map(lambda x: x.exactify(), betas)
 
-    # if a beta is requested then only compute the roots for that beta
+    # filter for requested value of beta. raise error if not found
     if not beta is None:
-        beta = sympy.sympify(beta)
-        roots = [root for root in roots if root == beta]
+        betas = [b for b in betas if b == beta]
+        if not betas:
+            raise ValueError('The point ({0}, {1}) is not on the '
+                             'curve {2}.'.format(alpha, beta, f))
 
-    # for each (requested) root, compute the corresponding puiseux
-    # singular parts. transform the solutiosn back to the origin
-    for b in roots:
-        H = g.subs(y,y+b)
-        singular_part_ab = puiseux_rational(H,x,y)
+    # for each (alpha, beta) determine the corresponding singular parts of the
+    # Puiseux series expansions. note that there may be multiple, distinct
+    # places above the same point.
+    singular_parts = []
+    for beta in betas:
+        H = g(y=y+beta)
+        singular_part_ab = puiseux_rational(H)
 
-
-        # move back to (alpha, beta)
+        # recenter the result back to (alpha, beta) from (0,0)
         for G,P,Q in singular_part_ab:
-            Q += b
-            Q /= transform.subs(x,P)
-
-            if alpha in infinities:
+            Q += beta
+            Q = Q/transform.subs({x:P})
+            if alpha == infinity:
                 P = 1/P
             else:
                 P += alpha
 
             # append to list of singular data
-            G,P,Q = map(lambda expr: rootofsimp(expr.subs(x,t)),(G,P,Q))
-            singular.append((G,P,Q))
+            singular_parts.append((G,P,Q))
 
-    # instantiate PuiseuxTSeries from the singular data
-    series = [PuiseuxTSeries(f,x,y,alpha,singular_data,t=t,
-                             order=order,exact=exact)
-              for singular_data in singular]
+    # # instantiate PuiseuxTSeries from the singular data
+    series = [PuiseuxTSeries(f, alpha, singular_data, order=order)
+              for singular_data in singular_parts]
 
-    # return x-series representations if requested
-    if not parametric:
-        series = [px for P in series for px in P.xseries()]
+    # # return x-series representations if requested
+    # if not parametric:
+    #     series = [px for P in series for px in P.xseries()]
     return series
-
 
 
 class PuiseuxTSeries(object):
@@ -574,12 +545,10 @@ class PuiseuxTSeries(object):
 
     Attributes
     ----------
-    f : sympy.Expr
-    x : sympy.Symbol
-    y : sympy.Symbol
+    f, x, y : polynomial
     x0 : complex
         The x-center of the Puiseux series expansion.
-    ramification_index : sympy.Rational
+    ramification_index : rational
         The ramification index :math:`e`.
     terms : list
         A list of exponent-coefficient pairs representing the y-series.
@@ -609,11 +578,8 @@ class PuiseuxTSeries(object):
         return not self._is_symbolic
 
     @property
-    def termsn(self):
-        if self.is_numerical:
-            return self.terms
-        else:
-            return [(numpy.int(n), numpy.complex(a)) for n,a in self.terms]
+    def terms(self):
+        return self.ypart.laurent_polynomial().dict().items()
     @property
     def xdatan(self):
         if self.is_numerical:
@@ -626,65 +592,67 @@ class PuiseuxTSeries(object):
     def order(self):
         return self._singular_order + self._regular_order
 
-    def __init__(self, f, x, y, x0, singular_data, t=sympy.Symbol('t'),
-                 order=None, exact=True):
+    def __init__(self, f, x0, singular_data, order=None):
         r"""Initialize a PuiseuxTSeries using a set of :math:`\pi = \{\tau\}`
         data.
 
         Parameters
         ----------
-        f : sympy.Expr
-        x : sympy.Symbol
-        y : sympy.Symbol
+        f, x, y : polynomial
+            A plane algebraic curve.
         x0 : complex
             The x-center of the Puiseux series expansion.
         singular_data : list
             The output of :func:`singular`.
+        t : variable
+            The variable in which the Puiseux t series is represented.
 
         """
+        R = f.parent()
+        x,y = R.gens()
+        extension_polynomial, xpart, ypart = singular_data
+        L = LaurentSeriesRing(ypart.base_ring(), 't')
+        t = L.gen()
+
         self.f = f
         self.x = x
         self.y = y
         self.t = t
-        self.x0 = x0
-
-        extension_polynomial,xpart,ypart = singular_data
+        self._xpart = xpart
+        self._ypart = ypart
 
         # store x-part attributes. handle the centered at infinity case
-        if x0 in [sympy.oo, numpy.Inf, 'oo']:
-            x0 = 0
-        xpartshift = xpart - x0
-        xcoefficient, ramification_index = xpartshift.as_coeff_exponent(self.t)
+        if x0 == infinity:
+            x0 = QQ(0)
+        self.x0 = x0
 
-        self.xpart = xpart
+        # extract and store information about the x-part of the puiseux series
+        xpart = xpart(x=t)
+        xpartshift = xpart - x0
+        ramification_index, xcoefficient = xpartshift.laurent_polynomial().dict().popitem()
         self.center = x0
         self.xcoefficient = xcoefficient
-        self.ramification_index = ramification_index
+        self.ramification_index = QQ(ramification_index).numerator()
+        self.xpart = xpart
 
-        # store the y-part attributes and extension data
-        ypart0 = ypart.subs(y,0)
-        self.ypart = ypart
-        self.terms = self.terms_from_yseries(ypart0)
-
-        self._initialize_extension(extension_polynomial, t, y)
+        # extract and sotre information about the y-part of the puiseux series
+        self.ypart = ypart(x=t,y=0)
+        self._initialize_extension(extension_polynomial, x, y)
 
         # determine the initial order. See the order property
-        self._singular_order = self.ypart.subs(y,sympy.O(t)).expand().getn()
-        self._regular_order = self._p.degree(t)
+        val = ypart(x=t,y=1).valuation()
+        self._singular_order = 0 if val == infinity else val
+        self._regular_order = self._p.degree(x)
 
-        # coerce data to Numpy numerical types if requested on
-        # construction
-        self._is_symbolic = exact
-        if self.is_numerical:
-            self.coerce_to_numerical()
+        # the curve, x-part, and terms output by puiseux make the puiseux
+        # series unique. any mutability only adds terms
+        self.__parent = self.ypart.parent()
+        self._hash = hash((self.f, self.xpart, self.ypart))
 
-        # the curve, x-part, and terms output by puiseux make the
-        # puiseux series unique. any mutability only adds terms
-        self._hash = hash((self.f,
-                           self.xpart,
-                           self.ypart))
+    def parent(self):
+        return self.__parent
 
-    def _initialize_extension(self, extension_polynomial, t, y):
+    def _initialize_extension(self, extension_polynomial, x, y):
         r"""Set up regular part extension machinery.
 
         RootOfs in expressions are not preserved under this
@@ -694,39 +662,34 @@ class PuiseuxTSeries(object):
 
         Parameters
         ----------
-        None
+        extension_polynomial, x, y : polynomial
 
         Returns
         -------
-        None
+        None : None
+            Internally sets hidden regular extension attributes.
         """
-        _phi = rootofsimp(extension_polynomial.as_poly(y))
-        _p = Poly(t,t)
-        _g = Poly(0,y)
+        # store attributes
+        _phi = extension_polynomial
+        _p = x.parent()(x)
+        _g = y.parent()(0)
         self._phi = _phi
+        self._phiprime = _phi.derivative(y)
         self._p = _p
         self._g = _g
 
-        rootofs = _phi.find(RootOf)
-        dummies = [sympy.Dummy() for _ in rootofs]
-        transform = dict(zip(rootofs,dummies))
-        _phi = _phi.xreplace(transform)
-
-        _phiprime = _phi.diff(self.y).as_poly(y)
-        _s = _phiprime.compose(_g).as_poly(t).invert(_p)
-
-        # transform back and store
-        transform = dict(zip(dummies,rootofs))
-        _phiprime = _phiprime.xreplace(transform).as_poly(y)
-        _s = _s.xreplace(transform).as_poly(t)
-        self._phiprime = rootofsimp(_phiprime)
+        # compute inverse of phi'(g) modulo x and store
+        _p = _p.polynomial(x)
+        _s = self._phiprime(y=_g).univariate_polynomial().inverse_mod(_p)
         self._s = rootofsimp(_s)
-
 
     def __repr__(self):
         """Print the x- and y-parts of the Puiseux series."""
-        s = str((self.eval_x(self.t),
-                 self.eval_y(self.t) + sympy.O(self.t**self.order)))
+        s = '('
+        s += str(self.xpart)
+        s += ', '
+        s += str(self.ypart)
+        s += ' + O(%s^%s))'%(self.t,self.order)
         return s
 
     def __hash__(self):
@@ -753,56 +716,6 @@ class PuiseuxTSeries(object):
                 return True
         return False
 
-    def coerce_to_numerical(self):
-        r"""Coerces coefficients and data to numerical types.
-
-        In numerical situations it is best to work with numerical types
-        instead of symbolic ones for performance purposes. When
-        `coerce_to_numerical` is executed all internal data structures
-        are converted to Numpy data types.
-
-        List of data coerced to numerical types:
-
-        * x-part terms
-        * y-part terms
-        * y-part series extension data
-
-        .. note::
-
-            Symbolic coefficient data is lost once this is performed.
-
-        Parameters
-        ---
-        None
-
-        Returns
-        ---
-        None
-
-        """
-        # coerce x-part terms
-        self.x0 = numpy.complex(self.x0)
-        self.center = numpy.complex(self.center)
-        self.xcoefficient = numpy.complex(self.xcoefficient)
-        self.ramification_index = numpy.int(self.ramification_index)
-
-        # coerce y-part terms and extension data
-        self.terms = [(numpy.int(n), numpy.complex(a)) for n,a in self.terms]
-        self.extension_terms = [
-            (numpy.int(q),
-            numpy.complex(mu),
-            numpy.int(m),
-            numpy.complex(beta),
-            numpy.complex(eta))
-            for (q,mu,m,beta,eta) in self.extension_terms
-            ]
-        self.extension_polynomial = dict(
-            ((numpy.int(i),numpy.int(j)),numpy.complex(c))
-            for ((i,j),c) in self.extension_polynomial.iteritems()
-            )
-
-        self._is_symbolic = False
-
     def xseries(self, all_conjugates=True):
         r"""Returns the corresponding x-series.
 
@@ -819,40 +732,38 @@ class PuiseuxTSeries(object):
             List of PuiseuxXSeries representations of this PuiseuxTSeries.
 
         """
-        exp = sympy.exp
-        pi = sympy.pi
-        I = sympy.I
+        L = self.ypart.parent()
+        t = R.gen()
+        S = L.base_ring()['z']
+        z = S.gen()
+
+        # given x = alpha + lambda*t^e solve for t. this involves finding an
+        # e-th root of either (1/lambda) or of lambda, depending on e's sign
         e = self.ramification_index
-        lamb = self.xcoefficient
+        lamb = S(self.xcoefficient)
         order = self.order
+        if e > 0:
+            phi = lamb*z**e - 1
+        else:
+            phi = z**abs(e) - lamb
+        mu = phi.roots(QQbar, multiplicities=False)[0]
 
-        # try to symbollically compute the e-th roots of 1/lambda. if we can't,
-        # resort to numerical approximation
-        try:
-            mu = sympy.root(rootofsimp(1/lamb),e)
-            conjugates = [mu*exp(2*pi*I*sympy.Rational(k,abs(e)))
-                          for k in range(abs(e))]
-        except NotImplementedError:
-            e = numpy.double(e)
-            mu = (sympy.S(1)/lamb).n()**(1./e)
-            conjugates = [mu*numpy.exp(2.0j*numpy.pi*k/abs(e))
-                          for k in range(int(abs(e)))]
+        if all_conjugates:
+            conjugates = [mu*exp(2*pi*I*k/abs(e)) for k in range(abs(e))]
+        else:
+            conjugates = [mu]
+        map(lambda x: x.exactify(), conjugates)
 
-        if not all_conjugates:
-            conjugates = conjugates[0:1]
-
-        # compute each conjugate x-series
+        # determine the resulting x-series
         xseries = []
         for c in conjugates:
-            terms = [(nh/e, rootofsimp(alphah*c**nh))
-                     for nh,alphah in self.terms]
-            p = PuiseuxXSeries(self.f,self.x,self.y,self.x0,terms,order=order,
-                               ramification_index=int(e))
+            t = self.ypart.parent().gen()
+            fconj = self.ypart.subs({t:(c*t)})
+            p = PuiseuxXSeries(fconj, self.x0, e)
             xseries.append(p)
         return xseries
 
     def nterms(self):
-
         """Returns the number of non-zero computed terms.
 
         Parameters
@@ -866,50 +777,6 @@ class PuiseuxTSeries(object):
         """
         return len(self.terms)
 
-
-    def terms_from_yseries(self, yseries):
-        r"""Efficiently extract the terms from the y-part of the series.
-
-        Polynomial arithmetic is efficient in Sympy. Write the y-part of
-        the Puiseux series as
-
-        .. math::
-
-            y_P(t) = \frac{1}{ct^d} p(t)
-
-        where :math:`p` is a polynomial in :math:`t`. We can efficiently
-        extract the coefficients of :math:`p` and perform the
-        appropriate transformation using the coefficient above.
-
-        Returns
-        -------
-        terms
-            A list of terms (n,beta) of the y-part of the series.
-
-        """
-        # [XXX] "bug" in sympy: cancel does not preserve quadratic
-        # RootOf's. we replace every occurence of RootOf in the yseries
-        # with a dummy
-        yseries = sympy.sympify(yseries).as_expr()
-        rootofs = yseries.find(RootOf)
-        dummies = [sympy.Dummy() for _ in rootofs]
-
-        transform = dict(zip(rootofs,dummies))
-        yseries = yseries.xreplace(transform)
-        numer,denom = cancel(yseries).as_numer_denom()
-
-        transform = dict(zip(dummies,rootofs))
-        numer = numer.xreplace(transform)
-        denom = denom.xreplace(transform)
-
-        # the numer and denominator are now appropriately
-        # extracted. determine the coefficients from these
-        numer = numer.as_poly(self.t)
-        lead_coeff,lead_exp = denom.as_coeff_exponent(self.t)
-        terms = [(n-lead_exp, rootofsimp(beta/lead_coeff))
-                 for ((n,),beta) in numer.terms()]
-        return terms
-
     def add_term(self, order=None):
         r"""Extend the y-series terms in-place using Newton iteration.
 
@@ -920,27 +787,15 @@ class PuiseuxTSeries(object):
 
         """
         g,s,p = newton_iteration_step(
-            self._phi,self._phiprime,
-            self._g,self._s,self._p,
-            self.t,self.y)
+            self._phi, self._phiprime, self._g, self._s, self._p)
 
         self._g = g
         self._s = s
         self._p = p
 
-        # dumb transformation necessary to preserve rootofs
-        rootofs = self.ypart.find(RootOf).union(self._g.find(RootOf))
-        dummies = [sympy.Dummy() for _ in rootofs]
-        transform = dict(zip(rootofs,dummies))
-
-        ypart = self.ypart.xreplace(transform).as_poly(self.y)
-        _g = self._g.xreplace(transform).as_poly(self.y)
-        yseries = ypart.compose(_g).as_expr()
-
-        transform = dict(zip(dummies,rootofs))
-        yseries = yseries.xreplace(transform)
-
-        self.terms = self.terms_from_yseries(yseries)
+        # operation below: yseries = ypart(y=g)(y=0)
+        t = self.t
+        self.ypart = (self._ypart)(y=g)(x=t)
         self._regular_order = self._p.degree()
 
     def extend(self, order=None):
@@ -999,13 +854,13 @@ class PuiseuxTSeries(object):
         num_iter = 0
         max_iter = 16
         while num_iter < max_iter:
-            xt = sympy.N(self.eval_x(t))
-            yt = sympy.N(self.eval_y(t))
+            xt = self.eval_x(t).n()
+            yt = self.eval_y(t).n()
             n,a = max(self.terms)
             a = a.n()
 
-            curve_error = abs(sympy.N(self.f.subs({self.x:xt,self.y:yt})))
-            rel_error = abs(sympy.N(a*t**n/yt))
+            curve_error = abs(self.f(x=xt,y=yt).n())
+            rel_error = abs((a*t**n/yt).n())
             if (curve_error < curve_tol) and (rel_error < rel_tol):
                 break
             else:
@@ -1049,15 +904,27 @@ class PuiseuxTSeries(object):
 
         Returns
         -------
-        complex
+        val = complex
 
         """
         center, xcoefficient, ramification_index = self.xdata
-        return center + xcoefficient*t**ramification_index
+        val = center + xcoefficient*t**ramification_index
+        return val
 
     def eval_dxdt(self, t):
+        r"""Evaluate the derivative of the x-part of the Puiseux series at 't'.
+
+        Parameters
+        ----------
+        t : complex
+
+        Returns
+        -------
+        val : complex
+        """
         center, xcoefficient, ramification_index = self.xdata
-        return xcoefficient*ramification_index*(1/t)**(1-ramification_index)
+        val = xcoefficient*ramification_index*t**(ramification_index-1)
+        return val
 
     def eval_y(self, t, order=None):
         r"""Evaluate of the y-part of the Puiseux series at `t`.
@@ -1095,11 +962,10 @@ class PuiseuxTSeries(object):
             terms = [(n,alpha) for n,alpha in self.terms if n < order]
         else:
             terms = self.terms
-
         return sum(alpha*t**n for n,alpha in terms)
 
 
-class PuiseuxXSeries(object):
+class PuiseuxXSeries(AlgebraElement):
     r"""A Puiseux x-series centered at :math:`x = x_0`.
 
     A Puiseux series :math:`p(x)` centered at :math:`x = x_0` is a
@@ -1114,536 +980,323 @@ class PuiseuxXSeries(object):
 
     Attributes
     ----------
-    f : sympy.Expr
-    x : sympy.Symbol
-    y : sympy.Symbol
-    x0 : complex
-        The center of the Puiseux series expansion.
-    terms : tuple
-        A list of exponent-coefficient pairs.
-    order : sympy.Rational
-        The order of the Puiseux series expansion.
-    ramification_index : sympy.Rational
-        The ramification index :math:`e`.
+    valuation
+    prec
+    center
 
     Methods
     -------
     eval
     evalf
-    valuation
-    as_sympy_expr
+    exponents
+    coefficients
+    list
+    is_zero
 
     """
     @property
-    def order(self):
-        return self._order
-    @order.setter
-    def order(self, value):
-        # if order isn't specified then set order equal to the exponent
-        # of the largest non-zero term plus 1/ramification_index
-        if value:
-            self._order = value
-        else:
-            order = max(exp for exp,coeff in self.terms)
-            self._order = order + 1/self.ramification_index
-
-        # truncate if new order is less than previous
-        self.terms = tuple((exp,coeff) for exp,coeff in self.terms
-                           if exp < self._order)
-        self._hash = hash((self.f, self.x0, self._terms, self._order))
+    def ramification_index(self):
+        return self.__e
 
     @property
-    def terms(self):
-        return self._terms
-    @terms.setter
-    def terms(self, value):
-        # filter out zero terms unless the series is the zero
-        # series. (useful for accumulation.)
-        terms = tuple((exp,coeff) for exp,coeff in value if coeff != 0)
-        if not value:
-            value = ((0,0),)
-        self._terms = value
-
-        # if order isn't set then assume all known terms are given. if
-        # order ends up being zero then set to infinity
-        if not self._order:
-            order = max(exp for exp,coeff in self._terms)
-            self._order = order if order else sympy.oo
-        self._hash = hash((self.f, self.x0, self._terms, self._order))
+    def center(self):
+        return self.__a
 
     @property
-    def is_symbolic(self):
-        return self._is_symbolic
-    @property
-    def is_numerical(self):
-        return not self._is_symbolic
+    def laurent_part(self):
+        return self.__f
 
-    def __init__(self, f, x, y, x0, obj, order=None, ramification_index=None):
-        r"""Initialize a PuiseuxXSeries.
+    def __init__(self, f, a=0, e=1):
+        r"""Initialize a Puiseux series.
 
-        A PuiseuxXSeries is initialized from a RiemannSurface, center
-        ``x0``, and choice of data:
-
-        * list, tuple: an iterable of (exponent, coefficient) 2-tuples
-        * dictionary: with exponents as keys and coefficients for values
-        * sympy.Expr: computed as a series representation in
-          :math:`x-x_0`.
-
-        Optionally, the order and ramification index of the series can
-        be directly specified. Otherwise, they are guessed from the
-        given data.
-
-        Parameters
-        ----------
-        f : sympy.Expr
-        x : sympy.Symbol
-        y : sympy.Symbol
-        x0 : complex
-            The center of the Puiseux series expansion.
-        obj : list, tuple, dict, or sympy.Expr
-            Data from which the series is initialized. (See
-            documentation above.)
-        order : sympy.Rational, optional
-            The order of the Puiseux series. Truncates the given data,
-            if necessary. If `obj` is a sympy.Expr then computes the
-            series expansion of obj in :math:`x-x_0`.
-        ramification_index : int, optional
-            If not provided, the ramification index will be set to the
-            gcd of the denominators appearing in the term exponents.
-
-        """
-        self.f = f
-        self.x = x
-        self.y = y
-        self.x0 = x0
-
-        # intitialize data from x-part
-        if x0 in [sympy.oo, numpy.Inf, 'oo']:
-            x0 = 0
-        self.center = x0
-        self.ramification_index = None
-
-        # intitalize terms from given object. coerce data to Numpy
-        # numerical types if requested on construction.
-        self._terms = None
-        self._order = None
-        terms = self.initialize_terms(obj, order=order)
-        self.terms = tuple(sorted(terms, key=itemgetter(0)))
-
-        # determine ramification index of this Puiseux series. if not
-        # explicitly given in construction it is assumed from the
-        # provided exponents and order
-        if not ramification_index:
-            exp, _ = map(list, zip(*self.terms))
-            exp += [self.order]
-            denoms = map(sympy.denom, exp)
-            ramification_index = sympy.gcd(denoms)
-        self.ramification_index = ramification_index
-        self.order = order
-        self._hash = None
-
-    ##################
-    # property: order
-    ##################
-    def get_order(self):
-        return self._order
-    def set_order(self, order):
-        # if order isn't specified then set order equal to the exponent
-        # of the largest non-zero term plus 1/ramification_index
-        if order:
-            self._order = order
-        else:
-            self._order = max(exp for exp,coeff in self.terms) + \
-                          sympy.Rational(1,self.ramification_index)
-
-        # truncate if new order is less than previous
-        self.terms = tuple((exp,coeff) for exp,coeff in self.terms
-                           if exp < self._order)
-    order = property(get_order, set_order)
-
-    ##################
-    # property: terms
-    ##################
-    def get_terms(self):
-        return self._terms
-    def set_terms(self, terms):
-        # filter out zero terms unless the series is the zero
-        # series. (useful for accumulation.)
-        terms = tuple(sorted(
-            [(exp,coeff) for exp,coeff in terms if coeff != 0],
-            key=itemgetter(0)))
-
-        if not terms:
-            terms = ((0,0),)
-        self._terms = terms
-
-        # if order isn't set then assume all known terms are given. if
-        # order ends up being zero then set to infinity
-        if not self._order:
-            order = max(exp for exp,coeff in self._terms)
-            self._order = order if order else sympy.oo
-    terms = property(get_terms, set_terms)
-
-    def __hash__(self):
-        """Returns the hash of this PuiseuxXSeries.
-
-        The has of a series is a hash of the Riemann surface, Puiseux
-        series expansion center, terms, and order. This is necessary for
-        memoization of PuiseuxXSeries. Particularly, in
-        :meth:`abelfucntions.integralbasis.integral_basis`.
-        """
-        if not self._hash:
-            self._hash = hash((self.x0,self.terms,self.order))
-        return self._hash
-
-    def __repr__(self):
-        s = ''
-        ss = '%s'%self.x if self.center == 0 else '(%s)'%(self.x-self.center)
-        for exp,coeff in self.terms:
-            # print the coefficient
-            s += ' + (%s)'%coeff
-            if exp != 0:
-                s += ss + '**(%s)'%exp
-        s += ' + O(%s**(%s))'%(ss, self.order)
-        return s[3:]
-
-    def initialize_terms(self, obj, order=None):
-        """Initialize the terms of the Puiseux series from the object ``obj``.
-
-        A PuiseuxXSeries can be initialized form a tuple, list,
-        dictionary, or Sympy ``Expression`` object. See
-        :meth:`__init__()` for more information.
-
-        If `obj` is a tuple or list each element is a 2-tuple whose
-        first element is the exponent and second element is the
-        coefficient of that term. If `obj` is a dictionary then the keys
-        are the exponents and the values are the coefficients. If `obj`
-        is a Sympy `Expression` then the powers and coefficients are
-        determined using `sympy.lseries`.
-
-        Parameters
-        ----------
-        obj : tuple, list, dict, or Sympify-able expression
-        order : int, optional
-
-        Returns
-        -------
-        tuple of two-tuples
-
-        """
-        if isinstance(obj,list):
-            obj = tuple(obj)
-        elif isinstance(obj,dict):
-            obj = tuple(obj.items())
-        if isinstance(obj, tuple):
-            return obj
-        else:
-            try:
-                return self._terms_from_sympy_expression(obj, order)
-            except sympy.SympifyError:
-                raise ValueError('Cannot initalize PuiseuxXSeries from %s'%obj)
-
-    def _terms_from_sympy_expression(self, expr, order=None):
-        r"""Compute series terms in (x-alpha) of a sympy expression.
-
-        .. note::
-
-            Sympy's `series()` function behaves differently depending on
-            whether `n` is specified. If `n` is given then the series is
-            indeed in :math:`(x-a)` but is written in :math:`x` so no
-            shifting is necessary. However, without `n` each term is
-            given as a power of :math:`(x-a)` so shifting (or alternate
-            parsing) is needed. Very weird.
-
-        Parameters
-        ----------
-        expr : sympy.Expr
-        order : int
-            (Default: 5) The desired order of the series approximation
-            of `expr`.
-
-        Returns
-        -------
-        tuple of 2-tuples
-
-        """
-        # optimize for various kinds of expressions
-        order = order if order else 5
-        numer,denom = expr.as_numer_denom()
-        if not expr.has(self.x):
-            return self._terms_from_sympy_const(expr,order)
-        if numer.is_algebraic_expr() and not denom.has(self.x):
-            return self._terms_from_sympy_polynomial(expr,order)
-        elif numer.is_algebraic_expr() and denom.is_algebraic_expr():
-            return self._terms_from_sympy_rational(expr,order)
-        else:
-            return self._terms_from_sympy_generic(expr,order)
-
-    def _terms_from_sympy_const(self, expr, order):
-        r"""Returns terms of constant expression.
-        """
-        return ((0,expr),)
-
-    def _terms_from_sympy_polynomial(self, expr, order):
-        r"""Returns terms from polynomial expression."""
-        expr = expr.subs({self.x:self.x+self.x0}).expand()
-        terms = expr.collect(self.x,evaluate=False).items()
-        terms = [(exp.as_coeff_exponent(self.x)[1],coeff)
-                 for exp,coeff in terms]
-        return tuple(terms)
-
-    def _terms_from_sympy_rational(self, expr, order):
-        r"""Returns terms from rational expression.
-
-        Common and potentially slow situation. This method first
-        separates the numerator and denominator. The denominator is
-        written as
-
-        ..math ::
-
-            d(x) = cx^l \tilde{d}(x)
-
-        where :math:`\tilde{d}(0) = 1`. This is so a fast Taylor series
-        calculation can be done on :math:`\tilde{d}`. The factor of
-        :math:`cx^l` is introduced back into the resulting series.
-
-        This approach is similar to the
-        :func:`abelfunctions.differentials.fast_expand` approach using
-        in localizing :class:`Differential` objects.
-
-        """
-        numer,denom = expr.as_numer_denom()
-        numer = numer.subs({self.x:self.x+self.x0}).expand()
-        numer = numer.collect(self.x,evaluate=False).items()
-        denom = denom.subs({self.x:self.x+self.x0}).expand()
-        lead_coeff, lead_exp = denom.leadterm(self.x)
-        denom = (denom/(lead_coeff*self.x**lead_exp)).expand()
-        denom = denom.collect(self.x,evaluate=False).items()
-
-        # forward solve the coefficient system. note that r[0]
-        # (constant coeff of denom) is nonzero by construction
-        N = max(int(round(order)),1)
-        q = [0]*N
-        for n,qn in numer:
-            n = n.as_coeff_exponent(self.x)[1]
-            if n < N:
-                q[n] = qn
-        r = [0]*N
-        for n,rn in denom:
-            n = n.as_coeff_exponent(self.x)[1]
-            if n < N:
-                r[n] = rn
-        s = [0]*N
-        for n in range(N):
-            known_terms = sum(r[n-k]*s[k] for k in range(n))
-            s[n] = (q[n] - known_terms)/r[0]
-
-        terms = [(n-lead_exp,s[n]/lead_coeff) for n in range(N)
-                 if s[n] not in [0,sympy.S(0)]]
-        return tuple(terms)
-
-    def _terms_from_sympy_generic(self, expr, order):
-        r"""Returns terms from a generic sympy expression.
-
-        The slowest method. Uses `sympy.lseries`.
-        """
-        terms = []
-        s = sympy.series(expr, self.x, x0=self.x0, n=None)
-        for term in s:
-            term = term.subs(self.x,self.x+self.x0)
-            coeff, exp = term.as_coeff_exponent(self.x)
-            terms.append((exp,coeff))
-            if exp >= order:
-                break
-        return tuple(terms)
-
-    ###########################################################################
-    # Operator Overloading
-    ###########################################################################
-    def __eq__(self, other):
-        if isinstance(other, PuiseuxXSeries):
-            if (self.terms == other.terms and
-                self.order == other.order and
-                self.x0 == other.x0):
-                return True
-        return False
-
-    def __neg__(self):
-        terms = tuple((exp,-coeff) for exp,coeff in self.terms)
-        order = self.order
-        ramification_index = self.ramification_index
-        return PuiseuxXSeries(self.f, self.x, self.y, self.x0, terms,
-                              order=order,
-                              ramification_index=ramification_index)
-
-    def __add__(self, other):
-        if not isinstance(other, PuiseuxXSeries):
-            order = self.order
-            ramification_index = self.ramification_index
-            other = PuiseuxXSeries(self.f, self.x, self.y, self.x0, other,
-                                   order=order,
-                                   ramification_index=ramification_index)
-        terms = []
-        order = min(self.order, other.order)
-        ramification_index = sympy.gcd(self.ramification_index,
-                                       other.ramification_index)
-        self_terms = dict(self.terms)
-        other_terms = dict(other.terms)
-        for exp in set(self_terms) | set(other_terms):
-            if exp <= order:
-                self_coeff = self_terms.get(exp,0)
-                other_coeff = other_terms.get(exp,0)
-                coeff = self_coeff + other_coeff
-                terms.append((exp,ratsimp(coeff)))
-        terms = tuple(terms)
-        return PuiseuxXSeries(self.f, self.x, self.y, self.x0, terms,
-                              order=order,
-                              ramification_index=ramification_index)
-
-    def __sub__(self, other):
-        return self.__add__(-other)
-
-    def __mul__(self, other):
-        if not isinstance(other, PuiseuxXSeries):
-            # the minimal order required for multiplication to be
-            # "loss-less" is (m + N - n) where N is the order of self, n
-            # is the degree of the leading order term of self, and m is
-            # the degree of the leading order term of other
-            if not isinstance(other, sympy.Basic):
-                other = sympy.sympify(other)
-            n = self.valuation()
-            N = self.order
-            m = other.leadterm(self.x)[1]
-            order = m + N - n
-            ramification_index = self.ramification_index
-            other = PuiseuxXSeries(self.f, self.x, self.y, self.x0, other,
-                                   order=order,
-                                   ramification_index=ramification_index)
-
-        # the order of the product (an(x-x0)^n + ... + O(x^N)) *
-        # (bn(x-x0)^m + ... + O(x^M)) is equal to the min m+N and
-        # n+M. Note that the terms are always in sorted order.
-        self_lo = self.terms[0][0]
-        other_lo = other.terms[0][0]
-        order = min(self_lo + other.order, other_lo + self.order)
-        ramification_index = sympy.gcd(self.ramification_index,
-                                       other.ramification_index)
-
-        # compute the terms up to order
-        terms = {}
-        for self_exp, self_coeff in self.terms:
-            for other_exp, other_coeff in other.terms:
-                exp = self_exp + other_exp
-                if exp <= order:
-                    coeff = self_coeff*other_coeff
-                    try:
-                        terms[exp] = coeff + terms[exp]
-                    except KeyError:
-                        terms[exp] = coeff
-
-        return PuiseuxXSeries(self.f, self.x, self.y, self.x0, terms,
-                              order=order,
-                              ramification_index=ramification_index)
-
-    def __div__(self, other):
-        # note: only works when ``other`` is a sympy.Expr
-        if not isinstance(other, sympy.Expr):
-            raise NotImplementedError('Can only divide by Sympy Expressions.')
-
-        return self.__mul__(1/other)
-
-    def __pow__(self, e):
-        zero = sympy.S(0)
-        one = sympy.S(1)
-        order = self.order
-        ramification_index = self.ramification_index
-
-        # use base-two representation of exponent for efficiency
-        current_power = self
-        val = PuiseuxXSeries(self.f, self.x, self.y, self.x0, ((zero, one),),
-                             order=order,
-                             ramification_index=ramification_index)
-        while e > 0:
-            # if the current power of two appears in the binary
-            # expansion of then add it to the result
-            if e % 2:
-                val = val * current_power
-            # compute the next power of two
-            current_power = current_power * current_power
-            e >>= 1
-
-        return val
-
-    def eval(self, x):
-        r"""Symbolic evaluation of the Puiseux series.
-
-        Parameters
-        ----------
-        x : complex
-
-        Returns
-        -------
-        complex
-
-        """
-        return sum(alpha * (x-self.center)**ne for ne,alpha in self.terms)
-
-    def evalf(self, x, n=8):
-        r"""Numerically evaluate the Puiseux series.
-
-        Parameters
-        ----------
-        x : complex
-        n : int
-            (Default: 8) Number of digits of accuracy.
-
-        Returns
-        -------
-        complex
-        """
-        val = self.eval(x)
-        if (val == sympy.zoo) or (val == sympy.oo):
-            val = numpy.infty
-        else:
-            val = val.n(n=n)
-        return numpy.complex(val)
-
-    def valuation(self):
-        r"""Returns the valuation of this Puiseux series.
-
-        The valuation of a Puiseux x-series is degree of the
-        lowest-order non-zero term. Specifically, if
+        The input :math:`f` is a Laurent series
 
         .. math::
 
-            y(x) = \sum_h=0^\infty \alpha_h (x-x_0)^(n_h/e)
+            f = \sum \alpha_n t^n,
 
-        then the valuation of :math:`y` is :math:`n_0/e`.
+        where :math:`a` and :math:`e` are such that
 
-        Parameters
-        ----------
-        None
+        .. math::
 
-        Returns
-        -------
-        sympy.Rational
+            t = (x-a)^{1/e}.
 
-        """
-        return min(self.terms)[0]
+        Thus, the Puiseux series
 
-    def as_sympy_expr(self):
-        r"""Returns the Puiseux series as a sympy expression.
+        .. math::
+
+            f = \sum \alpha_n (x - a)^{n/e}
+
+        is constructed.
 
         Parameters
         ----------
-        None
+        f : Laurent series
+            A laurent series in :math:`t = (x - a)^{1/e}`.
+        a : complex
+            The center of the Puiseux series.
+        e : integer
+            The ramification index of the Puiseux series.
+
+        """
+        # coerce input to laurent series
+        if isinstance(f, PuiseuxXSeries):
+            a = f.__a
+            e = f.__e
+            f = f.__f
+        elif not isinstance(f, LaurentSeries):
+            raise ValueError('%s must be a Laurent series.'%f)
+
+        # handle negative exponent
+        if e < 0:
+            t = f.parent().gen()
+            e = -e
+            f = f(t=t**(-1))
+
+        AlgebraElement.__init__(self, f.parent())
+        self._parent = f.parent()
+        self.__f = f
+        self.__e = QQ(e)
+        self.__a = self._parent(a)
+
+    def _repr_(self):
+        # TODO: the variable 'x' is hard-coded throughout. this should
+        # obviously change once a PuiseuxSeriesRing object is created
+        if self.is_zero():
+            if self.prec() == infinity:
+                return "0"
+            else:
+                return "O(%s^%s)"%(self._parent.variable_name(),self.prec())
+        s = " "
+        v = self.__f.list()  # coefficient list
+        valuation = self.valuation()
+        m = len(v)
+        if self.__a:
+            X = '(x - %s)'%(self.__a)
+        else:
+            X = 'x'
+
+        # print each term
+        atomic_repr = self._parent.base_ring()._repr_option('element_is_atomic')
+        first = True
+        for n in xrange(m):
+            x = v[n]
+            e = QQ(n)/self.__e + valuation
+            x = str(x)
+            if x != '0':
+                if not first:
+                    s += " + "
+                if ((not atomic_repr) and
+                    (x[1:].find("+") != -1 or x[1:].find("-") != -1)):
+                    x = "(%s)"%x
+                if e == 1:
+                    var = "*%s"%X
+                elif e == 0:
+                    var = ""
+                else:
+                    if e.denominator() == 1:
+                        var = "*%s^%s"%(X,e)
+                    else:
+                        var = "*%s^(%s)"%(X,e)
+                s += "%s%s"%(x,var)
+                first = False
+
+        # clean up
+        s = s.replace(" + -", " - ")
+        s = s.replace(" - -", " + ")
+        s = s.replace(" 1*"," ")
+        s = s.replace(" -1*", " -")
+
+        # bigoh
+        if self.prec() == 0:
+            bigoh = "O(1)"
+        elif self.prec() == 1:
+            #            bigoh = "O(%s)"%self._parent.variable_name()
+            bigoh = "O(x)"
+        else:
+            if self.__a:
+                bigoh = "O((x - %s)^%s)"%(self.__a,self.prec())
+            else:
+                bigoh = "O(x^%s)"%self.prec()
+        if self.prec() != infinity:
+            if s == " ":
+                return bigoh
+            s += " + %s"%bigoh
+        return s[1:]
+
+    def _common_ramification_index(self, right):
+        r"""Returns a ramification index common to self and right.
+
+        In order to perform arithmetic on Puiseux series it is useful to find a
+        common ramification index between two operands. That is, given Puiseux
+        series :math:`p` and :math:`q` of ramification indices :math:`e` and
+        :math:`f` we write both as series :math:`\tilde{f}` and
+        :math:`\tilde{g}` in :math:`(x-a)^(1/g)` such that,
+
+        .. math::
+
+            f = \tilde{f}((x-a)^M), g = \tilde{g}((x-a)^N).
+
+        Parameters
+        ----------
+        right : PuiseuxXSeries
 
         Returns
         -------
-        sympy.Expr
+        g : int
+            A ramification index common to self and right.
+        M, N : int
+            Scaling factors on self and right, respectively.
 
         """
-        expr = sympy.S(0)
-        for exp, coeff in self.terms:
-            expr += coeff*(self.x - self.x0)**exp
-        return expr
+        m = self.__e
+        n = right.__e
+        g = gcd(QQ(1)/m,QQ(1)/n).denominator()
+        M = QQ(g)/m
+        N = QQ(g)/n
+        return g, M, N
+
+    def __eq__(self, right):
+        f1 = self.__f
+        f2 = right.__f
+
+        if self.__a != right.__a:
+            return False
+        if self.__e != right.__e:
+            g, M, N = self._common_ramification_index(right)
+            t = self.parent().gen()
+            f1 = self.__f(t=t**M)
+            f2 = right.__f(t=t**N)
+        if f1 != f2:
+            return False
+        return True
+
+    def _add_(self, right):
+        # TODO: make it work for objects other than Puiseux series
+        if self.__a != right.__a:
+            raise ValueError('Can only add puiseux series with the same center.')
+
+        t = self.parent().gen()
+
+        # find a common ramification index
+        g, M, N = self._common_ramification_index(right)
+        f1 = self.__f(t=t**M)
+        f2 = right.__f(t=t**N)
+
+        # add
+        f = self._parent(f1 + f2)
+        return PuiseuxXSeries(f, self.__a, g)
+
+    def _sub_(self, right):
+        # TODO: make it work for objects other than Puiseux series
+
+        # find common ramification index
+        t = self.parent().gen()
+
+        # find a common ramification index
+        g, M, N = self._common_ramification_index(right)
+        f1 = self.__f(t=t**M)
+        f2 = right.__f(t=t**N)
+        f = self._parent(f1 - f2)
+        return PuiseuxXSeries(f, self.__a, g)
+
+    def _mul_(self, right):
+        # TODO make it work for objects other than Puiseux series
+
+        # find common ramification index
+        t = self.parent().gen()
+
+        # find a common ramification index
+        g, M, N = self._common_ramification_index(right)
+        f1 = self.__f(t=t**M)
+        f2 = right.__f(t=t**N)
+        f = self._parent(f1 * f2)
+        return PuiseuxXSeries(f, self.__a, g)
+
+    def _div_(self, right):
+        # TODO make it work for objects other than Puiseux series
+
+        # find common ramification index
+        t = self.parent().gen()
+
+        # find a common ramification index
+        g, M, N = self._common_ramification_index(right)
+        f1 = self.__f(t=t**M)
+        f2 = right.__f(t=t**N)
+        f = self._parent(f1 / f2)
+        return PuiseuxXSeries(f, self.__a, g)
+
+    def _neg_(self):
+        return PuiseuxXSeries(self.parent(-self.__f), self.__a, self.__e)
+
+    def eval(self, x):
+        xe = x**self.__e
+        return self.__f(xe)
+
+    def evalf(self, x, **kwds):
+        return self.eval(x).n(**kwds)
+
+    def ramification_index(self):
+        return self.__e
+
+    def valuation(self):
+        return self.__f.valuation()/self.__e
+
+    def prec(self):
+        return self.__f.prec()/self.__e
+
+    def coefficients(self):
+        return self.__f.coefficients()
+
+    def exponents(self):
+        return map(lambda e: e/self.__e, self.__f.exponents())
+
+    def is_zero(self):
+        return self.__f.is_zero()
+
+    def variable(self):
+        return self.__f.variable()
+
+    def list(self):
+        return self.__f.list()
+
+    def exponents(self):
+        return map(lambda e: QQ(e)/self.__e, self.__f.exponents())
+
+
+# if __name__=='__main__':
+#     R = QQ['x,y']
+#     x,y = R.gens()
+#     f1 = (x**2 - x + 1)*y**2 - 2*x**2*y + x**4
+#     f2 = -x**7 + 2*x**3*y + y**3
+#     f3 = (y**2-x**2)*(x-1)*(2*x-3) - 4*(x**2+y**2-2*x)**2
+#     f4 = y**2 + x**3 - x**2
+#     f5 = (x**2 + y**2)**3 + 3*x**2*y - y**3
+#     f6 = y**4 - y**2*x + x**2
+#     f7 = y**3 - (x**3 + y)**2 + 1
+#     f8 = x**2*y**6 + 2*x**3*y**5 - 1
+#     f9 = 2*x**7*y + 2*x**7 + y**3 + 3*y**2 + 3*y
+#     f10 = (x**3)*y**4 + 4*x**2*y**2 + 2*x**3*y - 1
+
+#     f = f2
+
+#     res = f.resultant(f.derivative(y),y)
+#     rts = res.univariate_polynomial().roots(QQbar, multiplicities=False)
+#     print 'Discriminant points:'
+#     for rt in rts:
+#         print rt
+#     print rts[0].minpoly()
+#     print
+
+
+#     P = puiseux(f,0)
+#     for p in P:
+#         p.extend(8)
+#         print 'Puiseux:'
+#         print 'x-part:', p.xpart
+#         print 'y-part:', p.ypart
+#         print 'x0:', p.x0
+#         Px = p.xseries()
+#         for px in Px:
+#             print px
+#         print
