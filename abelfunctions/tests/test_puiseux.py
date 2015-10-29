@@ -77,6 +77,14 @@ class TestNewtonPolygon(unittest.TestCase):
         EN = newton_polygon_exceptional(H)
         self.assertEqual(EN, [[(0,0),(4,0)]])
 
+        # issue 111
+        H = -x**8 + y**4 + x*y**2
+        EN = newton_polygon_exceptional(H)
+        self.assertEqual(EN, [[(0,0),(4,0)]])
+
+    def test_issue111(self):
+        H = -x**8 + y**4 + x*y**2
+        N = newton_polygon(H)
 
 class TestNewtonData(unittest.TestCase):
 
@@ -698,3 +706,25 @@ class TestPuiseux(AbelfunctionsTestCase):
         self.assertEqual(p[2].xpart, xpart)
         self.assertEqual(p[2].ypart, ypart)
 
+    def test_issue111(self):
+        # the curve -x^5 + x*z^4 + z^2 comes from recentering the curve in
+        # issue71 at the singular point (0,1,0)
+        f = -x**5 + x*y**4 + y**2
+
+        # two discriminant places
+        p = puiseux(f,0)
+        self.assertEqual(len(p), 2)
+
+        p[0].extend(16)
+        t = p[0].parent().gen()
+        xpart = t**2
+        ypart = t**5 - QQ(1)/2*t**17
+        self.assertEqual(p[0].xpart, xpart)
+        self.assertEqual(p[0].ypart, ypart)
+
+        p[1].extend(16)
+        t = p[1].parent().gen()
+        xpart = -t**2
+        ypart = -1/t - QQ(1)/2*t**11 + QQ(5)/8*t**23
+        self.assertEqual(p[1].xpart, xpart)
+        self.assertEqual(p[1].ypart, ypart)

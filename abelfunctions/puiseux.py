@@ -42,10 +42,6 @@ import numpy
 import sympy
 
 from operator import itemgetter
-from sympy import ( degree, Point, Segment, Poly, poly, Rational, Dummy,
-                    RootOf, gcd, gcdex, LC, expand, cancel, simplify, ratsimp)
-
-rootofsimp = lambda x: x
 
 from sage.all import I, pi
 from sage.functions.log import log, exp
@@ -61,12 +57,16 @@ from sage.rings.qqbar import QQbar
 from sage.rings.rational_field import QQ
 from sage.structure.element import AlgebraElement
 
+from sympy import Point, Segment
+
+import pdb
+
 
 def newton_polygon_exceptional(H):
     r"""Computes the exceptional Newton polygon of `H`."""
     R = H.parent()
     x,y = R.gens()
-    d = H(x=0).degree(y)
+    d = H(0,y).degree(y)
     return [[(0,0),(d,0)]]
 
 def newton_polygon(H, additional_points=[]):
@@ -214,7 +214,7 @@ def transform_newton_polynomial(H, q, m, l, xi):
     u,v = bezout(q,m)
     newx = (xi**v)*(x**q)
     newy = (x**m)*(xi**u + y)
-    newH = H.subs({x:newx,y:newy})
+    newH = H(newx,newy)
 
     # divide by x**l
     R = newH.parent()
@@ -311,7 +311,7 @@ def newton_iteration(G, n):
     try:
         pi = R(x).polynomial(x)
         gi = R(0)
-        si = R(phiprime(y=gi)).polynomial(x).inverse_mod(pi)
+        si = R(phiprime(x,gi)).polynomial(x).inverse_mod(pi)
     except NotImplementedError:
         raise ValueError('Newton iteration for computing regular part of '
                          'Puiseux expansion failed. Curve is most likely '
@@ -350,9 +350,9 @@ def newton_iteration_step(phi, phiprime, g, s, p):
     p = R(p).univariate_polynomial()
 
     pnext = p**2
-    gnext = g - phi(y=g).univariate_polynomial()*s
+    gnext = g - phi(x,g).univariate_polynomial()*s
     gnext = gnext % pnext
-    snext = 2*s - phiprime(y=gnext).univariate_polynomial()*s**2
+    snext = 2*s - phiprime(x,gnext).univariate_polynomial()*s**2
     snext = snext % pnext
 
     gnext = R(gnext)
@@ -389,7 +389,7 @@ def puiseux_rational(H, recurse=False):
 
     # when recurse is true, return if the leading order of H(0,y) is y
     if recurse:
-        IH = H(x=0).polynomial(y).ord()
+        IH = H(0,y).polynomial(y).ord()
         if IH == 1:
             return [(H,x,y)]
 
@@ -438,14 +438,21 @@ def almost_monicize(f):
     x,y = R.gens()
     transform = R(1)
     monic = False
-    while f.polynomial(y).leading_coefficient()(x=0) == 0:
-        r = f(y=y/x)
-        n = r.numerator()
-        d = r.denominator()
-        f = R(n)
-        transform *= x
+    while not monic:
+        if f.polynomial(y).leading_coefficient()(0) == 0:
+            # the denominator is always of the form x**d. Sage, however, has
+            # trouble reducing the expression to simplest terms. the following
+            # is a manual version
+            r = f(x,y/x)
+            n = r.numerator().polynomial(x)
+            d = r.denominator().degree(x)
+            shift = min(n.exponents() + [d])
+            n = n.shift(-shift)
+            f = R(n(x,y)) # XXX numerator evaluation is important!
+            transform *= x
+        else:
+            monic = True
     return f, transform
-
 
 def puiseux(f, alpha, beta=None, order=None, parametric=True):
     r"""Singular parts of the Puiseux series above :math:`x=\alpha`.
@@ -476,16 +483,16 @@ def puiseux(f, alpha, beta=None, order=None, parametric=True):
     if alpha in [infinity,'oo']:
         alpha = infinity
         d = f.degree(x)
-        F = f(x=1/x)*x**d
+        F = f(1/x,y)*x**d
         n,d = F.numerator(), F.denominator()
         falpha,_ = n.polynomial(x).quo_rem(d.univariate_polynomial())
         falpha = R(falpha)
     else:
-        falpha = f(x=x+alpha)
+        falpha = f(x+alpha,y)
 
     # determine the points on the curve lying above x=alpha
     g, transform = almost_monicize(falpha)
-    galpha = g(x=0).univariate_polynomial()
+    galpha = g(0,y).univariate_polynomial()
     betas = galpha.roots(ring=QQbar, multiplicities=False)
     map(lambda x: x.exactify(), betas)
 
@@ -501,13 +508,13 @@ def puiseux(f, alpha, beta=None, order=None, parametric=True):
     # places above the same point.
     singular_parts = []
     for beta in betas:
-        H = g(y=y+beta)
+        H = g(x,y+beta)
         singular_part_ab = puiseux_rational(H)
 
         # recenter the result back to (alpha, beta) from (0,0)
         for G,P,Q in singular_part_ab:
             Q += beta
-            Q = Q/transform.subs({x:P})
+            Q = Q/transform.univariate_polynomial()(P)
             if alpha == infinity:
                 P = 1/P
             else:
@@ -579,7 +586,11 @@ class PuiseuxTSeries(object):
 
     @property
     def terms(self):
-        return self.ypart.laurent_polynomial().dict().items()
+        terms = self.ypart.laurent_polynomial().dict().items()
+        # note that the following greatly affects singularities() and Int()
+        if not terms:
+            terms = [(0,0)]
+        return terms
     @property
     def xdatan(self):
         if self.is_numerical:
@@ -591,6 +602,22 @@ class PuiseuxTSeries(object):
     @property
     def order(self):
         return self._singular_order + self._regular_order
+
+    @property
+    def nterms(self):
+        """Returns the number of non-zero computed terms.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        int
+
+        """
+        return len(self.terms)
+
 
     def __init__(self, f, x0, singular_data, order=None):
         r"""Initialize a PuiseuxTSeries using a set of :math:`\pi = \{\tau\}`
@@ -615,32 +642,30 @@ class PuiseuxTSeries(object):
         t = L.gen()
 
         self.f = f
-        self.x = x
-        self.y = y
         self.t = t
         self._xpart = xpart
         self._ypart = ypart
 
         # store x-part attributes. handle the centered at infinity case
+        self.x0 = x0
         if x0 == infinity:
             x0 = QQ(0)
-        self.x0 = x0
+        self.center = x0
 
         # extract and store information about the x-part of the puiseux series
-        xpart = xpart(x=t)
+        xpart = xpart(t,0)
         xpartshift = xpart - x0
         ramification_index, xcoefficient = xpartshift.laurent_polynomial().dict().popitem()
-        self.center = x0
         self.xcoefficient = xcoefficient
         self.ramification_index = QQ(ramification_index).numerator()
         self.xpart = xpart
 
         # extract and sotre information about the y-part of the puiseux series
-        self.ypart = ypart(x=t,y=0)
-        self._initialize_extension(extension_polynomial, x, y)
+        self.ypart = L(ypart(t,0)) # XXX this may produce ordering bugs!
+        self._initialize_extension(extension_polynomial)
 
         # determine the initial order. See the order property
-        val = ypart(x=t,y=1).valuation()
+        val = L(ypart(t,1)).valuation() # XXX this may produce ordering bugs!
         self._singular_order = 0 if val == infinity else val
         self._regular_order = self._p.degree(x)
 
@@ -652,7 +677,7 @@ class PuiseuxTSeries(object):
     def parent(self):
         return self.__parent
 
-    def _initialize_extension(self, extension_polynomial, x, y):
+    def _initialize_extension(self, extension_polynomial):
         r"""Set up regular part extension machinery.
 
         RootOfs in expressions are not preserved under this
@@ -669,19 +694,24 @@ class PuiseuxTSeries(object):
         None : None
             Internally sets hidden regular extension attributes.
         """
+        R = extension_polynomial.parent()
+        x,y = R.gens()
+
         # store attributes
         _phi = extension_polynomial
-        _p = x.parent()(x)
-        _g = y.parent()(0)
+        _p = R(x)
+        _g = R(0)
         self._phi = _phi
         self._phiprime = _phi.derivative(y)
         self._p = _p
         self._g = _g
 
         # compute inverse of phi'(g) modulo x and store
-        _p = _p.polynomial(x)
-        _s = self._phiprime(y=_g).univariate_polynomial().inverse_mod(_p)
-        self._s = rootofsimp(_s)
+        _g = _g.univariate_polynomial()
+        _p = _p.univariate_polynomial()
+        ppg = self._phiprime.subs({y:_g}).univariate_polynomial()
+        _s = ppg.inverse_mod(_p)
+        self._s = _s
 
     def __repr__(self):
         """Print the x- and y-parts of the Puiseux series."""
@@ -733,7 +763,7 @@ class PuiseuxTSeries(object):
 
         """
         L = self.ypart.parent()
-        t = R.gen()
+        t = L.gen()
         S = L.base_ring()['z']
         z = S.gen()
 
@@ -763,20 +793,6 @@ class PuiseuxTSeries(object):
             xseries.append(p)
         return xseries
 
-    def nterms(self):
-        """Returns the number of non-zero computed terms.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        int
-
-        """
-        return len(self.terms)
-
     def add_term(self, order=None):
         r"""Extend the y-series terms in-place using Newton iteration.
 
@@ -795,10 +811,12 @@ class PuiseuxTSeries(object):
 
         # operation below: yseries = ypart(y=g)(y=0)
         t = self.t
-        self.ypart = (self._ypart)(y=g)(x=t)
+        L = self.ypart.parent()
+        g = g.univariate_polynomial()(t)
+        self.ypart = L(self._ypart(t,g))
         self._regular_order = self._p.degree()
 
-    def extend(self, order=None):
+    def extend(self, order=None, nterms=None):
         r"""Extends the series in place.
 
         Computes additional terms in the Puiseux series up to the
@@ -806,24 +824,30 @@ class PuiseuxTSeries(object):
         neither `degree` nor `nterms` are provided then the next
         non-zero term will be added to this t-series.
 
+        Remember that :meth:`add_term` updates `self.order` in-place.
+
         Parameters
         ----------
         order : int, optional
             The desired degree to extend the series to.
+        nterms : int, optional
+            The desired number of non-zero terms to extend the series to.
 
         Returns
         -------
         None
 
         """
-        # if no order is given, extend the series as little as possible
-        if not order:
-            order = self.order + 1
+        # order takes precedence
+        if order:
+            while self.order < order:
+                self.add_term()
+        elif nterms:
+            while self.nterms < nterms:
+                self.add_term()
 
-        # add_term() updates self.order in-place. keep adding terms
-        # until we exceed the desired order
-        while self.order < order:
-            self.add_term()
+        # if neither order or nterms is given, just call add_term
+        self.add_term()
 
     def extend_to_t(self, t, curve_tol=1e-8, rel_tol=1e-4):
         r"""Extend the series to accurately determine the y-values at `t`.
@@ -934,7 +958,7 @@ class PuiseuxTSeries(object):
 
         Parameters
         ----------
-        t : complex or complex
+        t : complex
         nterms : int, optional
             If provided, only evaluates using `nterms` in the y-part of
             the series.  If set to zero, will evaluate the principal
@@ -1240,7 +1264,10 @@ class PuiseuxXSeries(AlgebraElement):
         return self.__e
 
     def valuation(self):
-        return self.__f.valuation()/self.__e
+        val = self.__f.valuation()/self.__e
+        if val == infinity:
+            val = 0
+        return val
 
     def prec(self):
         return self.__f.prec()/self.__e
@@ -1263,40 +1290,3 @@ class PuiseuxXSeries(AlgebraElement):
     def exponents(self):
         return map(lambda e: QQ(e)/self.__e, self.__f.exponents())
 
-
-# if __name__=='__main__':
-#     R = QQ['x,y']
-#     x,y = R.gens()
-#     f1 = (x**2 - x + 1)*y**2 - 2*x**2*y + x**4
-#     f2 = -x**7 + 2*x**3*y + y**3
-#     f3 = (y**2-x**2)*(x-1)*(2*x-3) - 4*(x**2+y**2-2*x)**2
-#     f4 = y**2 + x**3 - x**2
-#     f5 = (x**2 + y**2)**3 + 3*x**2*y - y**3
-#     f6 = y**4 - y**2*x + x**2
-#     f7 = y**3 - (x**3 + y)**2 + 1
-#     f8 = x**2*y**6 + 2*x**3*y**5 - 1
-#     f9 = 2*x**7*y + 2*x**7 + y**3 + 3*y**2 + 3*y
-#     f10 = (x**3)*y**4 + 4*x**2*y**2 + 2*x**3*y - 1
-
-#     f = f2
-
-#     res = f.resultant(f.derivative(y),y)
-#     rts = res.univariate_polynomial().roots(QQbar, multiplicities=False)
-#     print 'Discriminant points:'
-#     for rt in rts:
-#         print rt
-#     print rts[0].minpoly()
-#     print
-
-
-#     P = puiseux(f,0)
-#     for p in P:
-#         p.extend(8)
-#         print 'Puiseux:'
-#         print 'x-part:', p.xpart
-#         print 'y-part:', p.ypart
-#         print 'x0:', p.x0
-#         Px = p.xseries()
-#         for px in Px:
-#             print px
-#         print
