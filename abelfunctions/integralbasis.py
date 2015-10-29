@@ -66,13 +66,13 @@ import pdb
 
 from functools import wraps, update_wrapper
 from sympy import (ratsimp, ceiling, RootOf, Dummy)
-from .puiseux import puiseux, PuiseuxTSeries, PuiseuxXSeries
-from .utilities import rootofsimp
+from abelfunctions.puiseux import puiseux, PuiseuxTSeries, PuiseuxXSeries
+from abelfunctions.utilities import rootofsimp
 
-def valuation():
-    pass
+from sage.all import infinity
+from sage.rings.rational_field import QQ
 
-def Int(i,px):
+def Int(i, px):
     r"""Computes :math:`Int_i = \sum_{k \neq i} v(p_i-p_k)`.
 
     ``Int`` is used in :func:`compute_expansion_bounds` for determining
@@ -81,17 +81,19 @@ def Int(i,px):
     Parameters
     ----------
     i : int
+        Index of the Puiseux series in the list, `px`, to compute `Int` of.
     p : list, PuiseuxXSeries
         A list of :class:`PuiseuxXSeries`.
 
     Returns
     -------
-    sympy.Rational
+    val : rational
+       The `Int` of the `i`th element of `px`.
 
     """
     n = len(px)
     pxi = px[i]
-    val = 0
+    val = QQ(0)
     for k in xrange(n):
         if k != i:
             val += (pxi-px[k]).valuation()
