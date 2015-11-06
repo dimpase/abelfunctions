@@ -650,6 +650,14 @@ class TestPuiseuxXSeries(unittest.TestCase):
     def test_prec(self):
         pass
 
+    def test_symbolic(self):
+        from sage.all import SR
+        L = LaurentSeriesRing(SR, 't')
+        t = L.gen()
+        a = SR('a')
+        p = PuiseuxXSeries(t**(-1) + a + 5*t + t**3 + 9*t**5, e=3, a=1)
+        self.assertTrue(a in p.list())
+
 
 class TestPuiseux(AbelfunctionsTestCase):
 
@@ -728,3 +736,44 @@ class TestPuiseux(AbelfunctionsTestCase):
         ypart = -1/t - QQ(1)/2*t**11 + QQ(5)/8*t**23
         self.assertEqual(p[1].xpart, xpart)
         self.assertEqual(p[1].ypart, ypart)
+
+    def test_prec(self):
+        L = LaurentSeriesRing(QQ, 't')
+        t = L.gen()
+
+        p = PuiseuxXSeries(L(1), 0, 1, order=5)
+        q = PuiseuxXSeries(t**3, 0, 1, order=5)
+        r = PuiseuxXSeries(t**(-1) + t**2, 0, 1, order=5)
+        s = PuiseuxXSeries(t**(-2) + t**(-1), 0, 1, order=5)
+
+        self.assertEqual((p*p).prec(), 5)
+        self.assertEqual((q*q).prec(), 8)
+        self.assertEqual((r*r).prec(), 4)
+        self.assertEqual((s*s).prec(), 3)
+
+        # ramified
+        p = PuiseuxXSeries(L(1), 0, 2, order=5)
+        q = PuiseuxXSeries(t**3, 0, 2, order=5)
+        r = PuiseuxXSeries(t**(-1) + t**2, 0, 2, order=5)
+        s = PuiseuxXSeries(t**(-2) + t**(-1), 0, 2, order=5)
+
+        self.assertEqual((p*p).prec(), QQ(5)/2)
+        self.assertEqual((q*q).prec(), QQ(8)/2)
+        self.assertEqual((r*r).prec(), QQ(4)/2)
+        self.assertEqual((s*s).prec(), QQ(3)/2)
+
+    def test_prec_bigoh(self):
+        from sage.rings.big_oh import O
+        L = LaurentSeriesRing(QQ, 't')
+        t = L.gen()
+
+        # same as test_prec, but using bigoh notation instead
+        p = PuiseuxXSeries(L(1) + O(t**5), 0, 2)
+        q = PuiseuxXSeries(t**3 + O(t**5), 0, 2)
+        r = PuiseuxXSeries(t**(-1) + t**2 + O(t**5), 0, 2)
+        s = PuiseuxXSeries(t**(-2) + t**(-1) + O(t**5), 0, 2)
+
+        self.assertEqual((p*p).prec(), QQ(5)/2)
+        self.assertEqual((q*q).prec(), QQ(8)/2)
+        self.assertEqual((r*r).prec(), QQ(4)/2)
+        self.assertEqual((s*s).prec(), QQ(3)/2)

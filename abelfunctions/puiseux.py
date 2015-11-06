@@ -660,7 +660,7 @@ class PuiseuxTSeries(object):
         self.ramification_index = QQ(ramification_index).numerator()
         self.xpart = xpart
 
-        # extract and sotre information about the y-part of the puiseux series
+        # extract and store information about the y-part of the puiseux series
         self.ypart = L(ypart(t,0)) # XXX this may produce ordering bugs!
         self._initialize_extension(extension_polynomial)
 
@@ -668,6 +668,9 @@ class PuiseuxTSeries(object):
         val = L(ypart(t,1)).valuation() # XXX this may produce ordering bugs!
         self._singular_order = 0 if val == infinity else val
         self._regular_order = self._p.degree(x)
+
+        # extend to have at least two elements
+        self.extend(nterms=1)
 
         # the curve, x-part, and terms output by puiseux make the puiseux
         # series unique. any mutability only adds terms
@@ -788,7 +791,7 @@ class PuiseuxTSeries(object):
         xseries = []
         for c in conjugates:
             t = self.ypart.parent().gen()
-            fconj = self.ypart.subs({t:(c*t)})
+            fconj = self.ypart(c*t) + O(t**(order+1))
             p = PuiseuxXSeries(fconj, self.x0, e)
             xseries.append(p)
         return xseries
@@ -845,9 +848,9 @@ class PuiseuxTSeries(object):
         elif nterms:
             while self.nterms < nterms:
                 self.add_term()
-
-        # if neither order or nterms is given, just call add_term
-        self.add_term()
+        else:
+            # if neither order or nterms is given, just call add_term
+            self.add_term()
 
     def extend_to_t(self, t, curve_tol=1e-8, rel_tol=1e-4):
         r"""Extend the series to accurately determine the y-values at `t`.
@@ -883,7 +886,7 @@ class PuiseuxTSeries(object):
             n,a = max(self.terms)
             a = a.n()
 
-            curve_error = abs(self.f(x=xt,y=yt).n())
+            curve_error = abs(self.f(xt,yt).n())
             rel_error = abs((a*t**n/yt).n())
             if (curve_error < curve_tol) and (rel_error < rel_tol):
                 break
@@ -1027,10 +1030,14 @@ class PuiseuxXSeries(AlgebraElement):
         return self.__a
 
     @property
+    def order(self):
+        return self.prec()
+
+    @property
     def laurent_part(self):
         return self.__f
 
-    def __init__(self, f, a=0, e=1):
+    def __init__(self, f, a=0, e=1, order=None):
         r"""Initialize a Puiseux series.
 
         The input :math:`f` is a Laurent series
@@ -1068,14 +1075,20 @@ class PuiseuxXSeries(AlgebraElement):
             a = f.__a
             e = f.__e
             f = f.__f
+            t = f.parent().gen()
         elif not isinstance(f, LaurentSeries):
             raise ValueError('%s must be a Laurent series.'%f)
 
+        t = f.parent().gen()
+
         # handle negative exponent
         if e < 0:
-            t = f.parent().gen()
             e = -e
             f = f(t=t**(-1))
+
+        # handle order: assumed that order is O((x-a)**order) = O(t**(order*e))
+        if order:
+            f += O(t**order)
 
         AlgebraElement.__init__(self, f.parent())
         self._parent = f.parent()
@@ -1200,9 +1213,8 @@ class PuiseuxXSeries(AlgebraElement):
         if self.__a != right.__a:
             raise ValueError('Can only add puiseux series with the same center.')
 
-        t = self.parent().gen()
-
         # find a common ramification index
+        t = self.parent().gen()
         g, M, N = self._common_ramification_index(right)
         f1 = self.__f(t=t**M)
         f2 = right.__f(t=t**N)
@@ -1213,11 +1225,11 @@ class PuiseuxXSeries(AlgebraElement):
 
     def _sub_(self, right):
         # TODO: make it work for objects other than Puiseux series
-
-        # find common ramification index
-        t = self.parent().gen()
+        if self.__a != right.__a:
+            raise ValueError('Can only subtract puiseux series with the same center.')
 
         # find a common ramification index
+        t = self.parent().gen()
         g, M, N = self._common_ramification_index(right)
         f1 = self.__f(t=t**M)
         f2 = right.__f(t=t**N)
@@ -1226,11 +1238,11 @@ class PuiseuxXSeries(AlgebraElement):
 
     def _mul_(self, right):
         # TODO make it work for objects other than Puiseux series
-
-        # find common ramification index
-        t = self.parent().gen()
+        if self.__a != right.__a:
+            raise ValueError('Can only multiply puiseux series with the same center.')
 
         # find a common ramification index
+        t = self.parent().gen()
         g, M, N = self._common_ramification_index(right)
         f1 = self.__f(t=t**M)
         f2 = right.__f(t=t**N)
@@ -1239,11 +1251,11 @@ class PuiseuxXSeries(AlgebraElement):
 
     def _div_(self, right):
         # TODO make it work for objects other than Puiseux series
-
-        # find common ramification index
-        t = self.parent().gen()
+        if self.__a != right.__a:
+            raise ValueError('Can only add puiseux series with the same center.')
 
         # find a common ramification index
+        t = self.parent().gen()
         g, M, N = self._common_ramification_index(right)
         f1 = self.__f(t=t**M)
         f2 = right.__f(t=t**N)
@@ -1260,9 +1272,6 @@ class PuiseuxXSeries(AlgebraElement):
     def evalf(self, x, **kwds):
         return self.eval(x).n(**kwds)
 
-    def ramification_index(self):
-        return self.__e
-
     def valuation(self):
         val = self.__f.valuation()/self.__e
         if val == infinity:
@@ -1270,7 +1279,10 @@ class PuiseuxXSeries(AlgebraElement):
         return val
 
     def prec(self):
-        return self.__f.prec()/self.__e
+        if self.__f.prec() == infinity:
+            return infinity
+        else:
+            return QQ(self.__f.prec())/self.__e
 
     def coefficients(self):
         return self.__f.coefficients()
@@ -1289,4 +1301,7 @@ class PuiseuxXSeries(AlgebraElement):
 
     def exponents(self):
         return map(lambda e: QQ(e)/self.__e, self.__f.exponents())
+
+    def parent(self):
+        return self.__f.parent()
 

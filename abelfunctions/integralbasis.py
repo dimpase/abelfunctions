@@ -61,13 +61,8 @@ Contents
 
 """
 
-import sympy
-import pdb
-
-from functools import wraps, update_wrapper
-from sympy import (ratsimp, ceiling, RootOf, Dummy)
 from abelfunctions.puiseux import puiseux, PuiseuxTSeries, PuiseuxXSeries
-from abelfunctions.utilities import rootofsimp
+from abelfunctions.utilities import cached_function
 
 from sage.all import infinity
 from sage.rings.rational_field import QQ
@@ -143,7 +138,7 @@ def compute_expansion_bounds(px):
     return N
 
 
-def compute_series_truncations(f, x, y, alpha):
+def compute_series_truncations(f, alpha):
     r"""Computes Puiseux series at :math:`x=\alpha` with necessary terms.
 
     The Puiseux series expansions of :math:`f = f(x,y)` centered at
@@ -153,22 +148,19 @@ def compute_series_truncations(f, x, y, alpha):
 
     Parameters
     ----------
-    f : sympy.Expr
-    x : sympy.Symbol
-    y : sympy.Symbol
-    alpha : sympy.Complex
+    f : polynomial
+    alpha : complex
 
     Returns
     -------
-    list, sympy.Expression
-        A list of Puiseux series expansions cetnered at :math:`x =
-        \alpha` with enough terms to compute integral bases as
-        SymPy expressions.
+    list : PuiseuxXSeries
+        A list of Puiseux series expansions centered at :math:`x = \alpha` with
+        enough terms to compute integral bases as SymPy expressions.
 
     """
-    # compute the parametric Puiseix series with the minimal number of
-    # terms needed to distinguish them.
-    pt = puiseux(f,x,y,alpha,parametric=True,exact=True)
+    # compute the parametric Puiseix series with the minimal number of terms
+    # needed to distinguish them.
+    pt = puiseux(f,alpha)
     px = [p for P in pt for p in P.xseries()]
 
     # compute the orders necessary for the integral basis algorithm. the orders
@@ -188,7 +180,7 @@ def compute_series_truncations(f, x, y, alpha):
     return px
 
 
-def integral_basis(f, x, y):
+def integral_basis(f):
     r"""Returns the integral basis of the algebraic function field of `f`.
 
     An integral basis for the algebraic function field :math:`O(X)` is a
@@ -211,86 +203,81 @@ def integral_basis(f, x, y):
         A list of rational functions representing an integral basis.
 
     """
-    # The base algorithm assumes f is monic. If this is not the case
-    # then monicize by applying the map `y -> y/lc(x), f -> lc^(d-1) f`
-    # where lc(x) is the leading coefficient of f.
-    d  = sympy.degree(f, y)
-    lc = sympy.LC(f, y)
-    if lc.has(x):
-        # bug in sympy: preserve any rootofs appearing in f
-        rootofs = f.find(RootOf)
-        dummies = [Dummy() for _ in rootofs]
-        transform = dict(zip(rootofs,dummies))
-        flc = f.xreplace(transform)
-        flc = sympy.ratsimp(flc.subs(y,y/lc)*lc**(d-1))
-        transform = dict(zip(dummies,rootofs))
-        flc = flc.xreplace(transform)
+    R = f.parent()
+    x,y = R.gens()
+
+    # The base algorithm assumes f is monic. If this is not the case then
+    # monicize by applying the map `y -> y/lc(x), f -> lc^(d-1) f` where lc(x)
+    # is the leading coefficient of f.
+    d  = f.degree(y)
+    lc = f.polynomial(y).leading_coefficient()
+    if lc.degree() > 0:
+        fmonic = R(f(x,y/lc)*lc**(d-1))
     else:
-        flc = f/lc
+        fmonic = f/lc
         lc = 1
 
     # compute the integral basis for the monicized curve
-    b = _integral_basis_monic(flc, x, y)
+    b = _integral_basis_monic(fmonic)
 
     # reverse leading coefficient scaling
     for i in xrange(1,len(b)):
-        b[i] = (b[i].subs(y, lc*y)).together()
+        b[i] = b[i](x,lc*y)
     return b
 
 
-def _integral_basis_monic(f,x,y):
+def _integral_basis_monic(f):
     r"""Returns the integral basis of a monic curve.
 
     Called by :func:`integral_basis` after monicizing its input curve.
 
     Parameters
     ----------
-    f : sympy.Expr
-    x : sympy.Symbol
-    y : sympy.Symbol
+    f : polynomial
 
     Returns
     -------
-    list, sympy.Expr
-        A list of rational functions representing an integral basis of
-        the monic curve.
+    list : rational functions
+        A list of rational functions representing an integral basis of the
+        monic curve.
 
     See Also
     --------
     integral_basis : generic integral basis function
 
     """
-    # compute df: the set of monic, irreducible polynomials k such that
-    # k**2 divides the resultant
-    p = sympy.Poly(f, [x,y])
-    n = p.degree(y)
-    res = sympy.resultant(p,p.diff(y),y).as_poly(x)
-    factors = sympy.factor_list(res)[1]
-    df = [k.as_expr() for k,deg in factors if (deg > 1) and (sympy.LC(k) == 1)]
+    R = f.parent()
+    x,y = R.gens()
 
-    # compute the Puiseux series expansions at the roots of each element
-    # of `df`. Extend these series to the necessary number of terms.
+    # compute df: the set of monic, irreducible polynomials k such that k**2
+    # divides the resultant
+    n = f.degree(y)
+    res = f.resultant(f.derivative(y),y).univariate_polynomial()
+    factor = res.factor()
+    df = [k.as_expr() for k,deg in factor
+          if (deg > 1) and (k.leading_coefficient() == 1)]
+
+    # compute the Puiseux series expansions at the roots of each element of
+    # `df`. Extend these series to the necessary number of terms.
     r = []
     alpha = []
     for k in df:
-        roots = k.as_poly(x).all_roots(radicals=True, multiple=False)
-        roots, multiplicities = zip(*roots)
+        roots = k.roots(QQbar, multiplicities=False)
         alpha.extend(roots)
 
     for alphak in alpha:
-        rk = compute_series_truncations(f,x,y,alphak)
+        rk = compute_series_truncations(f,alphak)
         r.append(rk)
 
     # main loop
-    a = tuple(sympy.Symbol('a%d'%k) for k in range(n))
-    b = [sympy.S(1)]
+    b = [R(1)]
     for d in range(1,n):
-        bd = compute_bd(f,x,y,b,df,r,alpha,a)
+        bd = compute_bd(f,b,df,r,alpha)
         b.append(bd)
     return b
 
 
-def compute_bd(f, x, y, b, df, r, alpha, a):
+def compute_bd(f, b, df, r, alpha):
     """Determine the next integral basis element from those already computed.
 
     Parameters
@@ -316,42 +303,44 @@ def compute_bd(f, x, y, b, df, r, alpha, a):
         The next integral basis element.
 
     """
+    R = f.parent()
+    x,y = R.gens()
     d = len(b)
-    b = tuple(b) # need to make hashable for caching
-    bd = y*b[-1] # guess for next integral basis element
+    a = var(''.join('a%d '%n for n in range(d)))
+    b = tuple(b)  # need to make hashable for caching
+    bd = y*b[-1]  # guess for next integral basis element
 
-    # loop over each k-factor and, therefore, each puiseux series
-    # centered at the root of k.
+    # loop over each k-factor and, therefore, each puiseux series centered at
+    # the root of k.
     for l in range(len(df)):
         k = df[l]
         alphak = alpha[l]
         rk = r[l]
-        found_something = True
-        while found_something:
+        sufficiently_singular = False
+        while not sufficiently_singular:
             # for each puiseux rki series at alphak determine the negative
-            # power coefficients and add these coeffs to the set of
+            # power coefficients of A and add these coeffs to the set of
             # equations we wish to solve for the a0,...,a(d-1)
             equations = []
             for rki in rk:
                 A = evaluate_A(a,b,rki)
                 A = A + evaluate_integral_basis_element(bd,rki)
 
-                # append the coefficients of the terms of order less
-                # than one to the system for the unknown ai's
                 terms = [coeff for exp,coeff in A.terms if exp < 1]
                 equations.extend(terms)
 
-            # the system of equations for the undetermined coefficients
-            # is now built. attempt to solve for the unknowns.
+            # build a system of equations for the undetermined coefficients
+            # from the singular part of the expansion. if a solution exists
+            # then the integral basis element is not singular enough at alphak
             sols = solve_coefficient_system(equations, a[:d])
             if sols:
                 # build next guess for current basis element
                 bdm1 = sum(sols[i]*b[i] for i in range(d))
-                bd = rootofsimp((bdm1 + bd) / k)
+                bd = (bdm1 + bd)/k
             else:
                 # no solution was found. the integral basis element is
                 # sufficiently singular at this alphak
-                found_something = False
+                sufficiently_singular = True
     return bd
 
 
@@ -400,70 +389,8 @@ def solve_coefficient_system(equations, vars, **kwds):
     return sols
 
 
-def memoize(f):
-    class memodict(dict):
-        def __getitem__(self, *key):
-            return dict.__getitem__(self, key)
-        def __missing__(self, key):
-            ret = self[key] = f(*key)
-            return ret
-    return memodict().__getitem__
-
-
-@memoize
-def evaluate_integral_basis_element(b,rki):
-    r"""Evaluates the integral basis element ``b`` at ``rki``.
-
-    Cached for performance considerations.
-
-    Parameters
-    ----------
-    b : sympy.Expr
-        An integral basis element: a function which is polynomial in
-        `y` but rational in `x`.
-    x : sympy.Symbol
-    y : sympy.Symbol
-    rki : sympy.Expression
-        A Puiseux series in `x`.
-    f : sympy.Expr
-    alphak : complex
-        The center of the Puiseux series expansion.
-
-    Returns
-    -------
-    PuiseuxXSeries
-
-    Notes
-    -----
-
-    Actually, there is some discussion to be had about the performance
-    benefits of caching. See the discussion in Issue #45 of
-    http://github.com/cswiercz/abelfunctions.
-
-    """
-    f = rki.f
-    x = rki.x
-    y = rki.y
-    alphak = rki.x0
-    order = rki.order
-    zero = ((sympy.S(0),sympy.S(0)),)
-    val = PuiseuxXSeries(f,x,y,alphak,zero,order=order)
-
-    # extract the coefficients and exponents of the numerator as a
-    # polynomial in y and evaluate as a PuiseuxXSeries
-    b_num, b_den = b.as_numer_denom()
-    b_num = sympy.poly(b_num,y)
-    for (exponent,), coeff in b_num.terms():
-        val = val + rki**exponent * coeff
-
-    # now that the numerator is a PuiseuxXSeries it will do the right
-    # thing when dividing by the denominator. (Expand into a
-    # sympy.lseries() and take the appropriate numer of terms.)
-    val = val/b_den
-    return val
-
-@memoize
-def evaluate_A(a,b,rki):
+@cached_function
+def evaluate_A(a, b, rki):
     r"""Evaluate the expression:
 
     .. math::
@@ -499,3 +426,116 @@ def evaluate_A(a,b,rki):
         term = term * ai
         A = A + term
     return A
+
+@cached_function
+def evaluate_integral_basis_element(b,rki):
+    r"""Evaluates the integral basis element ``b`` at ``rki``.
+
+    Cached for performance considerations.
+
+    Parameters
+    ----------
+    b : sympy.Expr
+        An integral basis element: a function which is polynomial in
+        `y` but rational in `x`.
+    x : sympy.Symbol
+    y : sympy.Symbol
+    rki : sympy.Expression
+        A Puiseux series in `x`.
+    f : sympy.Expr
+    alphak : complex
+        The center of the Puiseux series expansion.
+
+    Returns
+    -------
+    PuiseuxXSeries
+
+    Notes
+    -----
+    Actually, there is some discussion to be had about the performance
+    benefits of caching. See the discussion in Issue #45 of
+    http://github.com/cswiercz/abelfunctions.
+
+    """
+    L = rki.parent()
+    t = L.gen()
+
+    alphak = rki.center()
+    order = rki.order()
+    ramification_index = rki.ramification_index()
+    val = PuiseuxXSeries(L(0), alphak, ramification_index, order)
+
+    # extract the coefficients and exponents of the numerator as a polynomial
+    # in y and evaluate as a PuiseuxXSeries
+    b_num = b.numerator()
+    b_den = b.denominator()
+
+    R = b_num.parent()
+    x,y = R.gens()
+    b_num = b_num.polynomial(y)
+    b_den = b_den.polynomial(y)
+    for yexp, ycoeff in zip(b_num.exponents(), b_num.coefficients()):
+        # convert each coefficient into a puiseux series centered at alphak.
+        ycoeff = ycoeff(x+alphak)
+        coeff = L(0)
+        for xexp, xcoeff in zip(ycoeff.exponents(), ycoeff.coefficents()):
+            coeff += xcoeff * t**(xexp*ramificaiton_index)
+        val = val + coeff * rki**yexp
+
+    # now write the denominator as a puiseux series and divide
+    val = val/b_den
+    return val
+
+
+def evaluate_polynomial_at_puiseux_series(q, p):
+    r"""Evaluates the bivariate polynomial `q` at the Puiseux series `p`.
+
+    Given a polynomial `q = q(x,y)` and a :class:`PuiseuxXSeries` `p = p(x)`
+    return the expression
+
+    .. math::
+
+        q(x, p(x))
+
+    as a `PuiseuxXSeries`.
+
+    Parameters
+    ----------
+    q : bivariate polynomial
+    p : PuiseuxXSeries
+
+    Returns
+    -------
+    val : PuiseuxXSeries
+
+    Notes
+    -----
+    This function should become unnecessary once a proper PuiseuxSeriesRing is
+    constructed. I just don't have the time right now to learn about coercion
+    models and am instead wasting time on writing this function.
+
+    """
+    L = p.parent()
+    t = L.gen()
+    alphak = p.center
+    order = p.order
+    ramification_index = p.ramification_index
+    val = PuiseuxXSeries(L(0), alphak, ramification_index, order)
+
+    # the strategy is to treat q as a polynomial in y with coefficients in x
+    R = q.parent()
+    x,y = R.gens()
+    q = q.polynomial(y)
+    for yexp, ycoeff in zip(q.exponents(), q.coefficients()):
+        # convert each coefficient into a puiseux series centered at alphak.
+        ycoeff = ycoeff(x+alphak).univariate_polynomial()
+        coeff = L(0)
+
+        # t = (x - alpha)**(1/e) so (x-alpha) = t**e
+        for xexp, xcoeff in zip(ycoeff.exponents(), ycoeff.coefficients()):
+            coeff += xcoeff*t**(ramification_index*xexp)
+
+        coeff = PuiseuxXSeries(coeff, alphak, ramification_index, order)
+        val = val + coeff*p**yexp
+
+    return val

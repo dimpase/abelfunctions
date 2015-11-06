@@ -358,7 +358,7 @@ def _delta_invariant(P):
         # obtain the ramification index by retreiving the corresponding
         # parametric form. By definition, this parametric series satisfies
         # Y(t=0) = v0
-        ri = Pxi.ramification_index()
+        ri = Pxi.ramification_index
         delta += QQ(ri * IntPxi - ri + 1)/2
     return delta.numerator()
 
