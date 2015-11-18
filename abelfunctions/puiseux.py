@@ -1037,6 +1037,22 @@ class PuiseuxXSeries(AlgebraElement):
     def laurent_part(self):
         return self.__f
 
+    @property
+    def terms(self):
+        coeffs = self.__f.list()
+        u = self.__f.valuation()
+        terms = []
+        for n in range(len(coeffs)):
+            coeff = coeffs[n]
+            if coeff:
+                terms.append(((n-u)/self.__e,coeff))
+
+        # if there are no non-zero terms, return (0,0). this is important in
+        # some algorithms
+        if not terms:
+            terms = [(0,0)]
+        return terms
+
     def __init__(self, f, a=0, e=1, order=None):
         r"""Initialize a Puiseux series.
 
@@ -1138,12 +1154,6 @@ class PuiseuxXSeries(AlgebraElement):
                 s += "%s%s"%(x,var)
                 first = False
 
-        # clean up
-        s = s.replace(" + -", " - ")
-        s = s.replace(" - -", " + ")
-        s = s.replace(" 1*"," ")
-        s = s.replace(" -1*", " -")
-
         # bigoh
         if self.prec() == 0:
             bigoh = "O(1)"
@@ -1151,14 +1161,17 @@ class PuiseuxXSeries(AlgebraElement):
             #            bigoh = "O(%s)"%self._parent.variable_name()
             bigoh = "O(x)"
         else:
-            if self.__a:
-                bigoh = "O((x - %s)^%s)"%(self.__a,self.prec())
-            else:
-                bigoh = "O(x^%s)"%self.prec()
+            bigoh = "O(%s^%s)"%(X,self.prec())
         if self.prec() != infinity:
             if s == " ":
                 return bigoh
             s += " + %s"%bigoh
+
+        # clean up
+        s = s.replace(" + -", " - ")
+        s = s.replace(" - -", " + ")
+        s = s.replace(" 1*"," ")
+        s = s.replace(" -1*", " -")
         return s[1:]
 
     def _common_ramification_index(self, right):
@@ -1189,8 +1202,8 @@ class PuiseuxXSeries(AlgebraElement):
         m = self.__e
         n = right.__e
         g = gcd(QQ(1)/m,QQ(1)/n).denominator()
-        M = QQ(g)/m
-        N = QQ(g)/n
+        M = g/m
+        N = g/n
         return g, M, N
 
     def __eq__(self, right):
@@ -1202,11 +1215,15 @@ class PuiseuxXSeries(AlgebraElement):
         if self.__e != right.__e:
             g, M, N = self._common_ramification_index(right)
             t = self.parent().gen()
-            f1 = self.__f(t=t**M)
-            f2 = right.__f(t=t**N)
+            f1 = self.__f(t**M)
+            f2 = right.__f(t**N)
         if f1 != f2:
             return False
         return True
+
+    def _call_(self, x):
+        t = (x-self.__a)**(1/self.__e)
+        return f(t)
 
     def _add_(self, right):
         # TODO: make it work for objects other than Puiseux series
@@ -1216,8 +1233,8 @@ class PuiseuxXSeries(AlgebraElement):
         # find a common ramification index
         t = self.parent().gen()
         g, M, N = self._common_ramification_index(right)
-        f1 = self.__f(t=t**M)
-        f2 = right.__f(t=t**N)
+        f1 = self.__f(t**M)
+        f2 = right.__f(t**N)
 
         # add
         f = self._parent(f1 + f2)
@@ -1244,8 +1261,8 @@ class PuiseuxXSeries(AlgebraElement):
         # find a common ramification index
         t = self.parent().gen()
         g, M, N = self._common_ramification_index(right)
-        f1 = self.__f(t=t**M)
-        f2 = right.__f(t=t**N)
+        f1 = self.__f(t**M)
+        f2 = right.__f(t**N)
         f = self._parent(f1 * f2)
         return PuiseuxXSeries(f, self.__a, g)
 
@@ -1257,16 +1274,23 @@ class PuiseuxXSeries(AlgebraElement):
         # find a common ramification index
         t = self.parent().gen()
         g, M, N = self._common_ramification_index(right)
-        f1 = self.__f(t=t**M)
-        f2 = right.__f(t=t**N)
+        f1 = self.__f(t**M)
+        f2 = right.__f(t**N)
         f = self._parent(f1 / f2)
         return PuiseuxXSeries(f, self.__a, g)
 
     def _neg_(self):
-        return PuiseuxXSeries(self.parent(-self.__f), self.__a, self.__e)
+        return PuiseuxXSeries(self._parent(-self.__f), self.__a, self.__e)
+
+    def __pow__(self, r):
+        if r == 0:
+            return PuiseuxXSeries(self._parent(1), self.__a, self.__e)
+
+        f = self.__f**r
+        return PuiseuxXSeries(f, self.__a, self.__e)
 
     def eval(self, x):
-        xe = x**self.__e
+        t = (x - self.__a)**(1/self.__e)
         return self.__f(xe)
 
     def evalf(self, x, **kwds):
@@ -1304,4 +1328,7 @@ class PuiseuxXSeries(AlgebraElement):
 
     def parent(self):
         return self.__f.parent()
+
+    def change_ring(self, R):
+        return PuiseuxXSeries(self.__f.change_ring(R), self.__a, self.__e)
 

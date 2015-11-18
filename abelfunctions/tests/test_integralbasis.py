@@ -6,6 +6,7 @@ from abelfunctions.integralbasis import (
     evaluate_polynomial_at_puiseux_series,
 )
 
+from sage.all import SR
 from sage.rings.big_oh import O
 from sage.rings.laurent_series_ring import LaurentSeriesRing
 from sage.rings.rational_field import QQ
@@ -70,13 +71,13 @@ class TestEvaluatePolynomial(unittest.TestCase):
 
         poly = x*y
         expr = evaluate_polynomial_at_puiseux_series(poly, p)
-        p0 = PuiseuxXSeries(t, 0, 1, order=5)
+        p0 = PuiseuxXSeries(t + O(t**5), 0, 1)
         self.assertEqual(expr, p0)
         expr = evaluate_polynomial_at_puiseux_series(poly, q)
-        q0 = PuiseuxXSeries(t**2, 0, 1, order=5)
+        q0 = PuiseuxXSeries(t**2 + O(t**5), 0, 1)
         self.assertEqual(expr, q0)
         expr = evaluate_polynomial_at_puiseux_series(poly, r)
-        r0 = PuiseuxXSeries(t**2 + t**4, 0, 1, order=6)
+        r0 = PuiseuxXSeries(t**2 + t**4 + O(t**6), 0, 1)
         self.assertEqual(expr, r0)
         expr = evaluate_polynomial_at_puiseux_series(poly, s)
         s0 = PuiseuxXSeries(1 + t**3, 0, 1, order=5)
@@ -93,7 +94,7 @@ class TestEvaluatePolynomial(unittest.TestCase):
         r0 = PuiseuxXSeries(t**3 + 2*t**5, 0, 1, order=6)
         self.assertEqual(expr, r0)
         expr = evaluate_polynomial_at_puiseux_series(poly, s)
-        s0 = PuiseuxXSeries(t**(-2) + 2*t, 0, 1, order=4)
+        s0 = PuiseuxXSeries(t**(-1) + 2*t**2, 0, 1, order=5)
         self.assertEqual(expr, s0)
 
         poly = x**2*y
@@ -107,7 +108,7 @@ class TestEvaluatePolynomial(unittest.TestCase):
         r0 = PuiseuxXSeries(t**3 + t**5, 0, 1, order=6)
         self.assertEqual(expr, r0)
         expr = evaluate_polynomial_at_puiseux_series(poly, s)
-        s0 = PuiseuxXSeries(t**2 + t**4, 0, 1, order=5)
+        s0 = PuiseuxXSeries(t + t**4, 0, 1, order=5)
         self.assertEqual(expr, s0)
 
 
@@ -128,32 +129,77 @@ class TestEvaluatePolynomial(unittest.TestCase):
         p0 = PuiseuxXSeries(t, 0, 1, order=5)
         self.assertEqual(expr, p0)
         expr = evaluate_polynomial_at_puiseux_series(poly, q)
-        q0 = PuiseuxXSeries(t**2, 0, 1, order=5)
+        q0 = PuiseuxXSeries(t**3, 0, 2, order=5)
         self.assertEqual(expr, q0)
         expr = evaluate_polynomial_at_puiseux_series(poly, r)
-        r0 = PuiseuxXSeries(t**2 + t**4, 0, 1, order=6)
+        r0 = PuiseuxXSeries(t**3 + t**5, 0, 2, order=6)
         self.assertEqual(expr, r0)
 
         poly = x*y**2
         expr = evaluate_polynomial_at_puiseux_series(poly, p)
-        p0 = PuiseuxXSeries(t, 0, 1, order=5)
+        p0 = PuiseuxXSeries(t**2, 0, 2, order=5)
         self.assertEqual(expr, p0)
         expr = evaluate_polynomial_at_puiseux_series(poly, q)
-        q0 = PuiseuxXSeries(t**3, 0, 1, order=5)
+        q0 = PuiseuxXSeries(t**4, 0, 2, order=8)
         self.assertEqual(expr, q0)
         expr = evaluate_polynomial_at_puiseux_series(poly, r)
-        r0 = PuiseuxXSeries(t**3 + 2*t**5, 0, 1, order=6)
+        r0 = PuiseuxXSeries(t**4 + 2*t**6, 0, 2, order=6)
         self.assertEqual(expr, r0)
 
         poly = x**2*y
         expr = evaluate_polynomial_at_puiseux_series(poly, p)
-        p0 = PuiseuxXSeries(t**2, 0, 1, order=5)
+        p0 = PuiseuxXSeries(t**4, 0, 2, order=5)
         self.assertEqual(expr, p0)
         expr = evaluate_polynomial_at_puiseux_series(poly, q)
-        q0 = PuiseuxXSeries(t**3, 0, 1, order=5)
+        q0 = PuiseuxXSeries(t**5, 0, 2, order=7)
         self.assertEqual(expr, q0)
         expr = evaluate_polynomial_at_puiseux_series(poly, r)
-        r0 = PuiseuxXSeries(t**3 + t**5, 0, 1, order=6)
+        r0 = PuiseuxXSeries(t**5 + t**7, 0, 2, order=8)
+        self.assertEqual(expr, r0)
+
+    def test_monomial_ramified_SR(self):
+        R = SR['x,y']
+        x,y = R.gens()
+        L = LaurentSeriesRing(SR, 't')
+        t = L.gen()
+
+        # example puiseux series
+        p = PuiseuxXSeries(L(1) + O(t**5), 0, 2)
+        q = PuiseuxXSeries(t + O(t**5), 0, 2)
+        r = PuiseuxXSeries(t + t**3 + O(t**6), 0, 2)
+        s = PuiseuxXSeries(t**(-1) + t**2 + O(t**5), 0, 2)
+
+        poly = x*y
+        expr = evaluate_polynomial_at_puiseux_series(poly, p)
+        p0 = PuiseuxXSeries(t, 0, 1, order=5)
+        self.assertEqual(expr, p0)
+        expr = evaluate_polynomial_at_puiseux_series(poly, q)
+        q0 = PuiseuxXSeries(t**3, 0, 2, order=5)
+        self.assertEqual(expr, q0)
+        expr = evaluate_polynomial_at_puiseux_series(poly, r)
+        r0 = PuiseuxXSeries(t**3 + t**5, 0, 2, order=6)
+        self.assertEqual(expr, r0)
+
+        poly = x*y**2
+        expr = evaluate_polynomial_at_puiseux_series(poly, p)
+        p0 = PuiseuxXSeries(t**2, 0, 2, order=5)
+        self.assertEqual(expr, p0)
+        expr = evaluate_polynomial_at_puiseux_series(poly, q)
+        q0 = PuiseuxXSeries(t**4, 0, 2, order=8)
+        self.assertEqual(expr, q0)
+        expr = evaluate_polynomial_at_puiseux_series(poly, r)
+        r0 = PuiseuxXSeries(t**4 + 2*t**6, 0, 2, order=6)
+        self.assertEqual(expr, r0)
+
+        poly = x**2*y
+        expr = evaluate_polynomial_at_puiseux_series(poly, p)
+        p0 = PuiseuxXSeries(t**4, 0, 2, order=5)
+        self.assertEqual(expr, p0)
+        expr = evaluate_polynomial_at_puiseux_series(poly, q)
+        q0 = PuiseuxXSeries(t**5, 0, 2, order=7)
+        self.assertEqual(expr, q0)
+        expr = evaluate_polynomial_at_puiseux_series(poly, r)
+        r0 = PuiseuxXSeries(t**5 + t**7, 0, 2, order=8)
         self.assertEqual(expr, r0)
 
 

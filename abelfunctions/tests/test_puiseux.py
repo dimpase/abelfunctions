@@ -13,6 +13,7 @@ from abelfunctions.puiseux import (
 )
 from .test_abelfunctions import AbelfunctionsTestCase
 
+from sage.all import SR
 from sage.calculus.functional import taylor
 from sage.calculus.var import var
 from sage.rings.arith import xgcd
@@ -615,6 +616,20 @@ class TestPuiseuxXSeries(unittest.TestCase):
         self.assertEqual(q/p, r)
         self.assertEqual(p/q, s)
 
+    def test_pow(self):
+        from sage.rings.big_oh import O
+        L = LaurentSeriesRing(QQ, 't')
+        t = L.gen()
+        n = 2
+
+        p = PuiseuxXSeries(1 + t, e=1)
+        r = PuiseuxXSeries(1 + 2*t + t**2, e=1)
+        self.assertEqual(p**n, r)
+
+        p = PuiseuxXSeries(1 + t + O(t**2), e=1)
+        r = PuiseuxXSeries(1 + 2*t, e=1)
+        self.assertEqual(p**n, r)
+
     def test_valuation(self):
         L = LaurentSeriesRing(QQ, 't')
         t = L.gen()
@@ -646,6 +661,28 @@ class TestPuiseuxXSeries(unittest.TestCase):
         self.assertEqual(exponents, [QQ(-1)/3, 0, 1, QQ(8)/3])
         self.assertEqual(coefficients, [2, 3, 5, 7])
         self.assertEqual(list, [2,3,0,0,5,0,0,0,0,7])
+
+    def test_different_parents(self):
+        L = LaurentSeriesRing(QQ, 't')
+        t = L.gen()
+        M = LaurentSeriesRing(SR, 't')
+        s = M.gen()
+
+        p = PuiseuxXSeries(t, e=1)
+        q = PuiseuxXSeries(s, e=1)
+        print p
+        print q
+
+        r = PuiseuxXSeries(2*t, e=1)
+        print r
+        print p+q
+        self.assertEqual(p+q, r)
+
+        # r = PuiseuxXSeries(t**2, e=1)
+        # self.assertEqual(p*q, r)
+
+        # r = PuiseuxXSeries(L(1), e=1)
+        # self.assertEqual(p/q, r)
 
     def test_prec(self):
         pass
