@@ -37,11 +37,9 @@ Contents
 --------
 
 """
-
-import numpy
 import sympy
 
-from operator import itemgetter
+from abelfunctions.puiseux_series_ring import PuiseuxSeriesRing
 
 from sage.all import I, pi
 from sage.functions.log import log, exp
@@ -56,10 +54,7 @@ from sage.rings.polynomial.laurent_polynomial_ring import LaurentPolynomialRing
 from sage.rings.qqbar import QQbar
 from sage.rings.rational_field import QQ
 from sage.structure.element import AlgebraElement
-
 from sympy import Point, Segment
-
-import pdb
 
 
 def newton_polygon_exceptional(H):
@@ -765,10 +760,20 @@ class PuiseuxTSeries(object):
             List of PuiseuxXSeries representations of this PuiseuxTSeries.
 
         """
+        # obtain relevant rings:
+        #   o R = parent ring of curve
+        #   o L = parent ring of T-series
+        #   o S = temporary polynomial ring over base ring of T-series
+        #   o P = Puiseux series ring
         L = self.ypart.parent()
         t = L.gen()
         S = L.base_ring()['z']
         z = S.gen()
+
+        R = self.f.parent()
+        x,y = R.gens()
+        P = PuiseuxSeriesRing(L.base_ring(), str(x))
+        x = P.gen()
 
         # given x = alpha + lambda*t^e solve for t. this involves finding an
         # e-th root of either (1/lambda) or of lambda, depending on e's sign
@@ -791,8 +796,9 @@ class PuiseuxTSeries(object):
         xseries = []
         for c in conjugates:
             t = self.ypart.parent().gen()
-            fconj = self.ypart(c*t) + O(t**(order+1))
-            p = PuiseuxXSeries(fconj, self.x0, e)
+            fconj = self.ypart(c*t)
+            p = P(fconj(x**(QQ(1)/e)))
+            p = p.add_bigoh((order+1)/e)
             xseries.append(p)
         return xseries
 
@@ -1332,3 +1338,18 @@ class PuiseuxXSeries(AlgebraElement):
     def change_ring(self, R):
         return PuiseuxXSeries(self.__f.change_ring(R), self.__a, self.__e)
 
+
+if __name__ == '__main__':
+    R = QQ['x,y']
+    x,y = R.gens()
+    f = y**3 - 2*x**3*y + x**7
+
+    p = puiseux(f,0)
+    p[1].add_term()
+    p[1].add_term()
+    p[1].add_term()
+    p[1].add_term()
+    px = p[1].xseries()[0]
+    print '\npx =', px
+    print 'computing pxs...'
+    pxs = px.change_ring(SR)

@@ -283,94 +283,147 @@ def _integral_basis_monic(f):
         b.append(bd)
     return b
 
-
 def compute_bd(f, b, df, r, alpha):
-    """Determine the next integral basis element from those already computed.
-
-    Parameters
-    ----------
-    f : sympy.Expr
-    x : sympy.Symbol
-    y : sympy.Symbol
-    b : list
-        The current set of integral basis elements.
-    df : list
-        The set of irreducible factors.
-    r : list of PuiseuxTSeries
-        A list of lists of truncated Puiseux series centered each of the
-        x-values in the list `alpha`.
-    alpha : list of complex
-        The roots of each irreducible factor in `k`.
-    a : list of sympy.Symbols
-
-
-    Returns
-    -------
-    sympy.Expression
-        The next integral basis element.
-
-    """
+    """Determine the next integral basis element form those already computed."""
+    # obtain the ring of Puiseux series in which the truncated series
+    # live. these should already be such that the base ring is SR, the symbolic
+    # ring. (below we will have to introduce symbolic indeterminants)
     R = b[-1].parent()
     x,y = R.gens()
+    P = r[0][0].parent()
+    xx = P.gen()
+
+    # construct a list of indeterminants and a guess for the next integral
+    # basis element
     d = len(b)
-    a = [var('a%d'%n) for n in range(d)]
-    bd = R(y*b[-1])  # guess for next integral basis element
+    a = [SR('a%d'%n) for n in range(d)]
+    bd = R(y*b[-1])
 
-    print '============= = = = = = FUCK: = = = = = ==============='
-    print b[-1], type(b[-1]), b[-1].parent()
-    print bd, type(bd), bd.parent()
+    import pdb
 
-    # loop over each k-factor and, therefore, each puiseux series centered at
-    # the root of k.
+    # sufficiently singularize the current integral basis element guess at each
+    # of the singular points of df
     for l in range(len(df)):
-        k = df[l]
-        alphak = alpha[l]
-        rk = r[l]
+        k = df[l]  # factor
+        alphak = alpha[l]  # point at which the truncated series are centered
+        rk = r[l]  # truncated puiseux series
+
+        # singularize the current guess at the current point using each
+        # truncated Puiseux seriesx
         sufficiently_singular = False
         while not sufficiently_singular:
-            # for each puiseux rki series at alphak determine the negative
-            # power coefficients of A and add these coeffs to the set of
-            # equations we wish to solve for the a0,...,a(d-1)
+            # from each puiseux series, rki, centered at alphak construct a
+            # system of equations from the negative exponent terms appearing in
+            # the expression A(x,rki))
             equations = []
-            print 'CONSTRUCTING A FROM:'
-            print '\tb  =', b, type(b[0]), b[0].parent()
-            print '\tbd =', bd, type(bd), bd.parent()
             for rki in rk:
-                print '...using rki =', rki
-                A = evaluate_A(a,b,rki)
-
-                print 'A =', A, '\t', A.parent()
-                Ad = evaluate_integral_basis_element(bd,rki)
-
-                print 'Ad =', Ad, '\t', Ad.parent()
-                A += Ad
-
-                print 'A =', A
-                terms = [coeff for exp,coeff in A.terms if exp < 1]
-
-                print 'terms =', terms
+                pdb.set_trace()
+                A = sum(a[j]*b[j](xx,rki) for j in range(d))
+                A += bd(xx, rki)
+                terms = A.truncate(-1).coefficients()
                 equations.extend(terms)
 
-            # build a system of equations for the undetermined coefficients
-            # from the singular part of the expansion. if a solution exists
-            # then the integral basis element is not singular enough at alphak
-            print '\nEQUATIONS:'
-            print equations
+            pdb.set_trace()
+            # attempt to solve this linear system of equations. if a (unique)
+            # solution exists then the integral basis element is not singular
+            # enough at alphak
             sols = solve_coefficient_system(equations, a)
-            print 'SOLUTIONS:'
-            print sols
             if sols:
-                # build next guess for current basis element
-                bdm1 = sum(sols[i]*b[i] for i in range(d))
-                print 'OLD BD:', bd
-                print 'K:     ', k
-                bd = (bdm1 + bd)/k
-                print 'NEW BD:', bd
+                bdm1 = R(sum(sols[i]*b[i] for i in range(d)))
+                bd = (bdm1 + bd)/ k
             else:
-                # no solution was found. the integral basis element is
-                # sufficiently singular at this alphak
                 sufficiently_singular = True
     return bd
+
+# def compute_bd(f, b, df, r, alpha):
+#     """Determine the next integral basis element from those already computed.
+
+#     Parameters
+#     ----------
+#     f : sympy.Expr
+#     x : sympy.Symbol
+#     y : sympy.Symbol
+#     b : list
+#         The current set of integral basis elements.
+#     df : list
+#         The set of irreducible factors.
+#     r : list of PuiseuxTSeries
+#         A list of lists of truncated Puiseux series centered each of the
+#         x-values in the list `alpha`.
+#     alpha : list of complex
+#         The roots of each irreducible factor in `k`.
+#     a : list of sympy.Symbols
+
+
+#     Returns
+#     -------
+#     sympy.Expression
+#         The next integral basis element.
+
+#     """
+#     # obtain relevant rings: base ring of the 
+#     R = b[-1].parent()
+#     x,y = R.gens()
+#     P = r[0][0].parent()
+#     d = len(b)
+#     a = [var('a%d'%n) for n in range(d)]
+#     bd = R(y*b[-1])  # guess for next integral basis element
+
+#     print '============= = = = = = FUCK: = = = = = ==============='
+#     print b[-1], type(b[-1]), b[-1].parent()
+#     print bd, type(bd), bd.parent()
+
+#     # loop over each k-factor and, therefore, each puiseux series centered at
+#     # the root of k.
+#     for l in range(len(df)):
+#         k = df[l]
+#         alphak = alpha[l]
+#         rk = r[l]
+#         sufficiently_singular = False
+#         while not sufficiently_singular:
+#             # for each puiseux rki series at alphak determine the negative
+#             # power coefficients of A and add these coeffs to the set of
+#             # equations we wish to solve for the a0,...,a(d-1)
+#             equations = []
+#             print 'CONSTRUCTING A FROM:'
+#             print '\tb  =', b, type(b[0]), b[0].parent()
+#             print '\tbd =', bd, type(bd), bd.parent()
+#             for rki in rk:
+#                 print '...using rki =', rki
+#                 A = evaluate_A(a,b,rki)
+
+#                 print 'A =', A, '\t', A.parent()
+#                 Ad = evaluate_integral_basis_element(bd,rki)
+
+#                 print 'Ad =', Ad, '\t', Ad.parent()
+#                 A += Ad
+
+#                 print 'A =', A
+#                 terms = [coeff for exp,coeff in A.terms if exp < 1]
+
+#                 print 'terms =', terms
+#                 equations.extend(terms)
+
+#             # build a system of equations for the undetermined coefficients
+#             # from the singular part of the expansion. if a solution exists
+#             # then the integral basis element is not singular enough at alphak
+#             print '\nEQUATIONS:'
+#             print equations
+#             sols = solve_coefficient_system(equations, a)
+#             print 'SOLUTIONS:'
+#             print sols
+#             if sols:
+#                 # build next guess for current basis element
+#                 bdm1 = sum(sols[i]*b[i] for i in range(d))
+#                 print 'OLD BD:', bd
+#                 print 'K:     ', k
+#                 bd = (bdm1 + bd)/k
+#                 print 'NEW BD:', bd
+#             else:
+#                 # no solution was found. the integral basis element is
+#                 # sufficiently singular at this alphak
+#                 sufficiently_singular = True
+#     return bd
 
 
 def solve_coefficient_system(equations, vars, **kwds):
@@ -392,139 +445,139 @@ def solve_coefficient_system(equations, vars, **kwds):
     return sols
 
 
-def evaluate_A(a, b, rki):
-    r"""Evaluate the expression:
+# def evaluate_A(a, b, rki):
+#     r"""Evaluate the expression:
 
-    .. math::
+#     .. math::
 
-        A_i := a_1 b_1(x,r_{ki}) + \cdots + a_n b_n(x,r_{ki})
+#         A_i := a_1 b_1(x,r_{ki}) + \cdots + a_n b_n(x,r_{ki})
 
-    An intermediate computation in the evaluation of the integral
-    basis. Cached for performance purposes.
+#     An intermediate computation in the evaluation of the integral
+#     basis. Cached for performance purposes.
 
-    Parameters
-    ----------
-    a : list of sympy.Symbol
-    b : sympy.Expr
-        An integral basis element.
-    rki : PuiseuxXSeries
-        The Puiseux series at which to evaluate the "A" expression.
+#     Parameters
+#     ----------
+#     a : list of sympy.Symbol
+#     b : sympy.Expr
+#         An integral basis element.
+#     rki : PuiseuxXSeries
+#         The Puiseux series at which to evaluate the "A" expression.
 
-    Returns
-    -------
-    PuiseuxXSeries
-        `A` evaluated at `rki` as a Puiseux series.
-    """
-    d = len(b)
-    L = rki.parent()
-    alphak = rki.center
-    order = rki.order
-    A = PuiseuxXSeries(L(0),alphak,order=order)
-    for ai,bi in zip(a[:d],b):
-        ai = PuiseuxXSeries(L(ai),alphak,order=order)
-        term = evaluate_integral_basis_element(bi,rki)
-        term = term * ai
-        A = A + term
-    return A
-
-
-def evaluate_integral_basis_element(b,rki):
-    r"""Evaluates the integral basis element ``b`` at ``rki``.
-
-    Cached for performance considerations.
-
-    Parameters
-    ----------
-    b : sympy.Expr
-        An integral basis element: a function which is polynomial in
-        `y` but rational in `x`.
-    x : sympy.Symbol
-    y : sympy.Symbol
-    rki : sympy.Expression
-        A Puiseux series in `x`.
-    f : sympy.Expr
-    alphak : complex
-        The center of the Puiseux series expansion.
-
-    Returns
-    -------
-    PuiseuxXSeries
-
-    Notes
-    -----
-    Actually, there is some discussion to be had about the performance
-    benefits of caching. See the discussion in Issue #45 of
-    http://github.com/cswiercz/abelfunctions.
-
-    """
-    b_num = b.numerator()
-    b_den = b.denominator()
-    num = evaluate_polynomial_at_puiseux_series(b_num, rki)
-    den = evaluate_polynomial_at_puiseux_series(b_den, rki)
-    val = num / den
-
-    print '\nEVALUATE INTEGRAL BASIS ELEMENT:'
-    print 'b     =', b, ' ', type(b), b.parent()
-    print 'b_num =', b_num, ' ', type(b_num), b_num.parent()
-    print 'b_den =', b_den, ' ', type(b_den), b_den.parent()
-    print 'num =', num, ' ', type(num), num.parent()
-    print 'den =', den, ' ', type(den), den.parent()
-    print 'val   =', val, ' ', type(val), val.parent()
-    return val
+#     Returns
+#     -------
+#     PuiseuxXSeries
+#         `A` evaluated at `rki` as a Puiseux series.
+#     """
+#     d = len(b)
+#     L = rki.parent()
+#     alphak = rki.center
+#     order = rki.order
+#     A = PuiseuxXSeries(L(0),alphak,order=order)
+#     for ai,bi in zip(a[:d],b):
+#         ai = PuiseuxXSeries(L(ai),alphak,order=order)
+#         term = evaluate_integral_basis_element(bi,rki)
+#         term = term * ai
+#         A = A + term
+#     return A
 
 
-def evaluate_polynomial_at_puiseux_series(q, p):
-    r"""Evaluates the bivariate polynomial `q` at the Puiseux series `p`.
+# def evaluate_integral_basis_element(b,rki):
+#     r"""Evaluates the integral basis element ``b`` at ``rki``.
 
-    Given a polynomial `q = q(x,y)` and a :class:`PuiseuxXSeries` `p = p(x)`
-    return the expression
+#     Cached for performance considerations.
 
-    .. math::
+#     Parameters
+#     ----------
+#     b : sympy.Expr
+#         An integral basis element: a function which is polynomial in
+#         `y` but rational in `x`.
+#     x : sympy.Symbol
+#     y : sympy.Symbol
+#     rki : sympy.Expression
+#         A Puiseux series in `x`.
+#     f : sympy.Expr
+#     alphak : complex
+#         The center of the Puiseux series expansion.
 
-        q(x, p(x))
+#     Returns
+#     -------
+#     PuiseuxXSeries
 
-    as a `PuiseuxXSeries`.
+#     Notes
+#     -----
+#     Actually, there is some discussion to be had about the performance
+#     benefits of caching. See the discussion in Issue #45 of
+#     http://github.com/cswiercz/abelfunctions.
 
-    Parameters
-    ----------
-    q : bivariate polynomial
-    p : PuiseuxXSeries
+#     """
+#     b_num = b.numerator()
+#     b_den = b.denominator()
+#     num = evaluate_polynomial_at_puiseux_series(b_num, rki)
+#     den = evaluate_polynomial_at_puiseux_series(b_den, rki)
+#     val = num / den
 
-    Returns
-    -------
-    val : PuiseuxXSeries
+#     print '\nEVALUATE INTEGRAL BASIS ELEMENT:'
+#     print 'b     =', b, ' ', type(b), b.parent()
+#     print 'b_num =', b_num, ' ', type(b_num), b_num.parent()
+#     print 'b_den =', b_den, ' ', type(b_den), b_den.parent()
+#     print 'num =', num, ' ', type(num), num.parent()
+#     print 'den =', den, ' ', type(den), den.parent()
+#     print 'val   =', val, ' ', type(val), val.parent()
+#     return val
 
-    Notes
-    -----
-    This function should become unnecessary once a proper PuiseuxSeriesRing is
-    constructed. I just don't have the time right now to learn about coercion
-    models and am instead wasting time on writing this function.
 
-    """
-    L = p.parent()
-    t = L.gen()
-    alphak = p.center
-    ramification_index = p.ramification_index
-    order = p.order*ramification_index # use the t-order, not x-order
-    val = PuiseuxXSeries(L(0), alphak, ramification_index, order)
+# def evaluate_polynomial_at_puiseux_series(q, p):
+#     r"""Evaluates the bivariate polynomial `q` at the Puiseux series `p`.
 
-    # the strategy is to treat q as a polynomial in y with coefficients in x
-    R = q.parent()
-    x,y = R.gens()
-    q = q.polynomial(y)
-    for yexp, ycoeff in zip(q.exponents(), q.coefficients()):
-        # convert each coefficient into a puiseux series centered at alphak.
-        ycoeff = ycoeff(x+R(alphak)).univariate_polynomial()
-        coeff = L(0)
+#     Given a polynomial `q = q(x,y)` and a :class:`PuiseuxXSeries` `p = p(x)`
+#     return the expression
 
-        # t = (x - alpha)**(1/e) so (x-alpha) = t**e
-        for xexp, xcoeff in zip(ycoeff.exponents(), ycoeff.coefficients()):
-            coeff += xcoeff*t**(ramification_index*xexp)
+#     .. math::
 
-        # coefficient has no order: it is exact
-        coeff = PuiseuxXSeries(coeff, alphak, ramification_index)
-        val = val + coeff*p**int(yexp)
-    return val
+#         q(x, p(x))
+
+#     as a `PuiseuxXSeries`.
+
+#     Parameters
+#     ----------
+#     q : bivariate polynomial
+#     p : PuiseuxXSeries
+
+#     Returns
+#     -------
+#     val : PuiseuxXSeries
+
+#     Notes
+#     -----
+#     This function should become unnecessary once a proper PuiseuxSeriesRing is
+#     constructed. I just don't have the time right now to learn about coercion
+#     models and am instead wasting time on writing this function.
+
+#     """
+#     L = p.parent()
+#     t = L.gen()
+#     alphak = p.center
+#     ramification_index = p.ramification_index
+#     order = p.order*ramification_index # use the t-order, not x-order
+#     val = PuiseuxXSeries(L(0), alphak, ramification_index, order)
+
+#     # the strategy is to treat q as a polynomial in y with coefficients in x
+#     R = q.parent()
+#     x,y = R.gens()
+#     q = q.polynomial(y)
+#     for yexp, ycoeff in zip(q.exponents(), q.coefficients()):
+#         # convert each coefficient into a puiseux series centered at alphak.
+#         ycoeff = ycoeff(x+R(alphak)).univariate_polynomial()
+#         coeff = L(0)
+
+#         # t = (x - alpha)**(1/e) so (x-alpha) = t**e
+#         for xexp, xcoeff in zip(ycoeff.exponents(), ycoeff.coefficients()):
+#             coeff += xcoeff*t**(ramification_index*xexp)
+
+#         # coefficient has no order: it is exact
+#         coeff = PuiseuxXSeries(coeff, alphak, ramification_index)
+#         val = val + coeff*p**int(yexp)
+#     return val
 
 
 if __name__=='__main__':

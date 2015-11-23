@@ -20,11 +20,6 @@ Examples
 Contents
 --------
 """
-import sympy
-from sympy import RootOf, Rational, Poly
-
-import abelfunctions
-import abelfunctions.puiseux
 from abelfunctions.puiseux import puiseux
 from abelfunctions.integralbasis import Int
 from abelfunctions.utilities import rootofsimp, cached_function
@@ -299,7 +294,7 @@ def _multiplicity(P):
                     si = ri
 
         m += min(ri,si)
-    return sympy.S(m)
+    return ZZ(m)
 
 
 def _branching_number(P):
