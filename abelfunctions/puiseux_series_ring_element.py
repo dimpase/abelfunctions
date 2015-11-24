@@ -201,7 +201,13 @@ class PuiseuxSeries(AlgebraElement):
                 s += str(coeff)
                 first = False
             else:
-                s += ' + %s'%(coeff)
+                # if the coefficient itself is a sum (e.g. complex number or
+                # expression) then wrap with parens
+                coeff = str(coeff)
+                if coeff[1:].find("+") != -1 or coeff[1:].find("-") != -1:
+                    s += ' + (%s)'%coeff
+                else:
+                    s += ' + %s'%coeff
 
             # don't print (x-a)^0
             if exp:
