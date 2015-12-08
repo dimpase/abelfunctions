@@ -1,8 +1,7 @@
-import sage
+import abelfunctions
 import unittest
 
-from sage.all import *
-
+from sage.rings.rational_field import QQ
 R = QQ['x,y']
 x,y = R.gens()
 

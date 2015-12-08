@@ -57,24 +57,6 @@ class TestIntegralBasis(AbelfunctionsTestCase):
         b = [1, x*y, x*y**2, y**3*x, x**2*y**4, y**5*x**2]
         self.assertEqual(a,b)
 
-    def test_f8a(self):
-        # the curve f8 recentered at the singular point (1 : 0 : 0)
-        R = QQ['x,y']
-        x,y = R.gens()
-        g = -y**8 + x**6 + 2*x**5
-        a = integral_basis(g)
-        b = [1, y, y**2/x, y**3/x, y**4/x**2, y**5/x**3, y**6/x**3, y**7/x**4]
-        self.assertEqual(a,b)
-
-    def test_f8b(self):
-        # the curve f8 recentered at the singular point (0 : 1 : 0)
-        R = QQ['x,y']
-        x,y = R.gens()
-        g = -y**8 + 2*x**3 + x**2
-        a = integral_basis(g)
-        b = [1, y, y**2, y**3, y**4/x, y**5/x, y**6/x, y**7/x]
-        self.assertEqual(a,b)
-
     def test_f9(self):
         x,y = self.f9.parent().gens()
         a = integral_basis(self.f9)

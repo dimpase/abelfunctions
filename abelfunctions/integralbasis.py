@@ -55,7 +55,6 @@ from sage.matrix.constructor import Matrix, zero_matrix
 from sage.rings.polynomial.all import PolynomialRing
 from sage.rings.rational_field import QQ
 from sage.rings.qqbar import QQbar
-from sage.symbolic.relation import solve
 
 def Int(i, px):
     r"""Computes :math:`Int_i = \sum_{k \neq i} v(p_i-p_k)`.
@@ -200,11 +199,11 @@ def integral_basis(f):
     # monicize by applying the map `y -> y/lc(x), f -> lc^(d-1) f` where lc(x)
     # is the leading coefficient of f.
     d  = f.degree(y)
-    lc = f.polynomial(y).leading_coefficient()
+    lc = R(f.polynomial(y).leading_coefficient())
     if lc.degree() > 0:
-        fmonic = R(f(x,y/lc)*lc**(d-1))
+        fmonic = (f(x,y/lc)*lc**(d-1)).numerator()
     else:
-        fmonic = R(f/lc)
+        fmonic = (f/lc).numerator()
         lc = 1
 
     # compute the integral basis for the monicized curve
@@ -313,7 +312,7 @@ def compute_bd(f, b, df, r, alpha):
             # enough at alphak
             sols = solve_coefficient_system(Q, equations, a)
             if not sols is None:
-                bdm1 = sum(F(sols[i])*b[i] for i in range(d))
+                bdm1 = sum(F(sols[i][0])*b[i] for i in range(d))
                 bd = F(bdm1 + bd)/ F(k)
             else:
                 sufficiently_singular = True
@@ -323,12 +322,13 @@ def solve_coefficient_system(Q, equations, vars):
     # NOTE: to make things easier (and uniform) in the univariate case a dummy
     # variable is added to the polynomial ring. See compute_bd()
     a = Q.gens()[:-1]
+    B = Q.base_ring()
 
     # construct the coefficient system and right-hand side
     system = [[e.coefficient({ai:1}) for ai in a] for e in equations]
-    system = Matrix(system)
+    system = Matrix(B, system)
     rhs = [-e.constant_coefficient() for e in equations]
-    rhs = Matrix(rhs).transpose()
+    rhs = Matrix(B, rhs).transpose()
 
     # we only allow unique solutions. return None if there are infinitely many
     # solutions or if no solution exists. Sage will raise a ValueError in both
@@ -339,24 +339,3 @@ def solve_coefficient_system(Q, equations, vars):
         return None
     return sol
 
-
-if __name__=='__main__':
-    R = QQ['x,y']
-    x,y = R.gens()
-
-    f1 = (x**2 - x + 1)*y**2 - 2*x**2*y + x**4
-    f2 = -x**7 + 2*x**3*y + y**3
-    f3 = (y**2-x**2)*(x-1)*(2*x-3) - 4*(x**2+y**2-2*x)**2
-    f4 = y**2 + x**3 - x**2
-    f5 = (x**2 + y**2)**3 + 3*x**2*y - y**3
-    f6 = y**4 - y**2*x + x**2
-    f7 = y**3 - (x**3 + y)**2 + 1
-    f8 = x**2*y**6 + 2*x**3*y**5 - 1
-    f9 = 2*x**7*y + 2*x**7 + y**3 + 3*y**2 + 3*y
-    f10 = (x**3)*y**4 + 4*x**2*y**2 + 2*x**3*y - 1
-
-    f = y**3 - x**8 + x**4
-    import pdb; pdb.set_trace()
-    b = integral_basis(f)
-
-    print b

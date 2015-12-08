@@ -223,6 +223,7 @@ def _transform(f, singular_pt):
 
     """
     alpha, beta, gamma = singular_pt
+    B = (alpha+beta+gamma).parent()
 
     # if the point is affine then return the affine curve and point
     if gamma == 1:
@@ -235,14 +236,28 @@ def _transform(f, singular_pt):
         # project into the y- and x-planes depending on where the singular
         # point lives
         if alpha == 0:
-            g = F(y=beta)
-            R = F.base_ring()[g.variables()]
-            g = R(g)
+            #R = F.change_ring(B)['%s,%s'%(x,z)]
+            #x,z = R.gens()
+            g = F(x,beta,z)
+
+            R = g.base_ring()['%s,%s'%(x,z)]
+            R = R.change_ring((alpha+gamma).parent())
+            x,z = R.gens()
+            g = g(x,0,z)
+            alpha = R.base_ring()(alpha)
+            gamma = R.base_ring()(gamma)
             return g,alpha,gamma
         else:
-            g = F(x=alpha)
-            R = F.base_ring()[g.variables()]
-            g = R(g)
+            #R = F.change_ring(B)['%s,%s'%(y,z)]
+            #y,z = R.gens()
+            g = F(alpha,y,z)
+
+            R = g.base_ring()['%s,%s'%(y,z)]
+            R = R.change_ring((beta+gamma).parent())
+            y,z = R.gens()
+            g = g(0,y,z)
+            beta = R.base_ring()(beta)
+            gamma = R.base_ring()(gamma)
             return g,beta,gamma
 
 def _multiplicity(P):
