@@ -223,42 +223,27 @@ def _transform(f, singular_pt):
 
     """
     alpha, beta, gamma = singular_pt
-    B = (alpha+beta+gamma).parent()
 
     # if the point is affine then return the affine curve and point
     if gamma == 1:
         return f,alpha,beta
+
+    # otherwise, homogenize and recenter at the singular point
+    F = f.homogenize('z')
+    R = F.parent()
+    x,y,z = R.gens()
+    if alpha == 0:
+        g = F(x,beta,z)
+        S = g.base_ring()[g.variables()]
+        x,z = S.gens()
+        g = g(x,0,z)
+        return g,alpha,gamma
     else:
-        F = f.homogenize('z')
-        x,y,z = F.parent().gens()
-        d = F.total_degree()
-
-        # project into the y- and x-planes depending on where the singular
-        # point lives
-        if alpha == 0:
-            #R = F.change_ring(B)['%s,%s'%(x,z)]
-            #x,z = R.gens()
-            g = F(x,beta,z)
-
-            R = g.base_ring()['%s,%s'%(x,z)]
-            R = R.change_ring((alpha+gamma).parent())
-            x,z = R.gens()
-            g = g(x,0,z)
-            alpha = R.base_ring()(alpha)
-            gamma = R.base_ring()(gamma)
-            return g,alpha,gamma
-        else:
-            #R = F.change_ring(B)['%s,%s'%(y,z)]
-            #y,z = R.gens()
-            g = F(alpha,y,z)
-
-            R = g.base_ring()['%s,%s'%(y,z)]
-            R = R.change_ring((beta+gamma).parent())
-            y,z = R.gens()
-            g = g(0,y,z)
-            beta = R.base_ring()(beta)
-            gamma = R.base_ring()(gamma)
-            return g,beta,gamma
+        g = F(alpha,y,z)
+        S = g.base_ring()[g.variables()]
+        y,z = S.gens()
+        g = g(0,y,z)
+        return g,beta,gamma
 
 def _multiplicity(P):
     r"""Computes the multiplicity of the singularity at :math:`u_0,v_0`.

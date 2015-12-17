@@ -30,8 +30,8 @@ Functions
 References
 ----------
 
-.. [Mnuk] M. Mnuk, "An algebraic approach to computing adjoint curves",
-   Journal of Symbolic Computation, vol. 23 (2-3), pp. 229-40, 1997.
+.. [Mnuk] M. Mnuk, "An algebraic approach to computing adjoint curves", Journal
+   of Symbolic Computation, vol. 23 (2-3), pp. 229-40, 1997.
 
 Examples
 --------
@@ -85,11 +85,13 @@ def mnuk_conditions(g, b, generic_adjoint, c):
 
     # reduce b*P modulo g. we need to cast b*P and g into the "full" polynomial
     # ring R[u,v,*c]
+    #import pdb; pdb.set_trace()
     numer = b.numerator()
     denom = b.denominator()
     u,v = map(T, R.gens())
     expr = numer(u,v) * generic_adjoint(u,v)
-    q,r = expr.quo_rem(g(u,v))
+    ideal = T.ideal(g(u,v))
+    r = expr.reduce(ideal)
 
     # divide by the largest power of x appearing in the denominator. this is
     # sufficient since we've shifted the curve and its singularity to appear at
@@ -139,7 +141,7 @@ def recenter_curve(g, singular_point):
 
 
 def differentials_numerators(f):
-    """Returns the numerators of a basis of holomorphic differentials on a Riemann
+    """Return the numerators of a basis of holomorphic differentials on a Riemann
     surface.
 
     Parameters
@@ -153,18 +155,22 @@ def differentials_numerators(f):
         differentials of the first kind.
 
     """
-    # homogenize and compute total defree
-    R = f.parent()
+    # homogenize and compute total degree
+    R = f.parent().change_ring(QQbar)
     x,y = R.gens()
     d = f.total_degree()
 
     # construct the generalized adjoint polynomial. we want to think of it as
     # an element of B[*c][x,y] where B is the base ring of f and *c are the
     # indeterminates
-    cvars = ','.join('c_%d_%d'%(i,j) for i in range(d-2) for j in range(d-2))
-    S = R.base_ring()[cvars][x,y]
+    cvars = ['c_%d_%d'%(i,j) for i in range(d-2) for j in range(d-2)]
+    vars = cvars + list(R.variable_names())
+    C = PolynomialRing(QQbar, cvars)
+    S = PolynomialRing(C, [x,y])
+    T = PolynomialRing(QQbar, vars)
     c = S.base_ring().gens()
-    P = sum(c[i+(d-2)*j] * S(x)**i * S(y)**j
+    x,y = S(x),S(y)
+    P = sum(c[i+(d-2)*j] * x**i * y**j
             for i in range(d-2) for j in range(d-2)
             if i+j <= d-3)
 

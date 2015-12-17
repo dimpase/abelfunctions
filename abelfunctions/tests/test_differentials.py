@@ -44,5 +44,5 @@ class TestDifferentialsNumerators(AbelfunctionsTestCase):
     def test_f8(self):
         x,y = self.f8.parent().gens()
         a = differentials_numerators(self.f8)
-        b = []
+        b = [y, x*y, x*y**4]
         self.assertEqual(a,b)
