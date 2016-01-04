@@ -98,9 +98,17 @@ def mnuk_conditions(g, u, v, b, P, c):
     except KeyError:
         mult = 0
 
+    print '\n\nr =', r
+    print 'denom =', denom
+    print 'mult  =', mult
+
     r = r.as_poly(u,v)
     coeffs = r.coeffs()
     monoms = r.monoms()
+    print coeffs
+    print monoms
+    print
+    print
     conditions = [coeff for coeff,monom in zip(coeffs,monoms)
                   if monom[0] < mult]
     return conditions
@@ -122,6 +130,9 @@ def differentials(RS):
     list, Differential
 
     """
+    print '====================='
+    print '=== DIFFERENTIALS ==='
+    print '====================='
     f = RS.f
     x = RS.x
     y = RS.y
@@ -145,6 +156,9 @@ def differentials(RS):
     # center at u=0. determine the conditions on P
     S = singularities(f,x,y)
     conditions = []
+    print '\nSingularities:'
+    print S
+    print '\n--- LOOP ---'
     for singular_pt,(m,delta,r) in S:
         # recenter the curve and adjoint polynomial at the singular
         # point: find the affine plane u,v such that the singularity
@@ -154,18 +168,37 @@ def differentials(RS):
         Ptilde,u,v,u0,v0 = _transform(P,x,y,z,singular_pt)
         Ptilde = Ptilde.subs(u,u+u0)
 
+        print '- singular point -'
+        print singular_pt
+        print '\ng transform:'
+        print g
+        print 'P transform:'
+        print Ptilde
+
         # compute the intergral basis at the recentered singular point
         # and determine the Mnuk conditions of the adjoint polynomial
         b = integral_basis(g,u,v)
+
+        print '\n- integral basis -'
+        print b
         for bi in b:
             conditions_bi = mnuk_conditions(g,u,v,bi,Ptilde,c)
             conditions.extend(conditions_bi)
+            print '\nbi:   ', bi
+            print 'conds:', conditions_bi
 
     # solve the system of equations and retreive the coefficents of the
     # c_ij's contained in the general solution
+    print '\n--- END LOOP ---'
+    print 'all conds:'
+    print conditions
     sols = sympy.solve(conditions, c)
     P = P.subs(sols).as_poly(*c)
+    print '\nfinal P:', P.as_expr()
     numerators = [coeff for coeff in P.coeffs() if coeff != 0]
+    print '\nNUMERATORS:'
+    print numerators
+
     dfdy = sympy.diff(f,y)
     differentials = [AbelianDifferentialFirstKind(RS,numer,dfdy)
                      for numer in numerators]
