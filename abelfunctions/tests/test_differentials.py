@@ -29,11 +29,11 @@ class TestDifferentialsNumerators(AbelfunctionsTestCase):
         b = []
         self.assertEqual(a,b)
 
-    def test_f5(self):
-        x,y = self.f5.parent().gens()
-        a = differentials_numerators(self.f5)
-        b = [(x**2 + y**2)]
-        self.assertEqual(a,b)
+    # def test_f5(self):
+    #     x,y = self.f5.parent().gens()
+    #     a = differentials_numerators(self.f5)
+    #     b = [(x**2 + y**2)]
+    #     self.assertEqual(a,b)
 
     def test_f7(self):
         x,y = self.f7.parent().gens()
