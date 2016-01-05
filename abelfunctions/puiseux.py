@@ -880,25 +880,38 @@ class PuiseuxTSeries(object):
         -------
         none
             The PuiseuxTSeries is modified in-place.
+
+        Note
+        ----
+        This doesn't work well in the infinite case. (Puiseux series centered
+        at x=oo.)
         """
-        # note that we need to keep track of how much the y-value
-        # changes with each iteration just in case it is intersecting
-        # with a different branch of the curve
+        # note that we need to keep track of how much the y-value changes with
+        # each iteration just in case it is intersecting with a different
+        # branch of the curve. to do this we need at least one non-zero term
+        self.extend(nterms=1)
+
         num_iter = 0
         max_iter = 16
+        yprev = infinity
         while num_iter < max_iter:
-            xt = self.eval_x(t).n()
-            yt = self.eval_y(t).n()
+            xt = self.eval_x(t)
+            yt = self.eval_y(t)
             n,a = max(self.terms)
-            a = a.n()
+            curve_error = abs(self.f(xt,yt))
 
-            curve_error = abs(self.f(xt,yt).n())
-            rel_error = abs((a*t**n/yt).n())
+            # XXX hack for the infinity case: don't use relative error
+            if self.x0 == infinity:
+                rel_error = 0.0
+            else:
+                rel_error = abs(a*t**n/yt) if yt else 0.0
+
+            # break if both tolerances are satisfied. otherwise, add a term
             if (curve_error < curve_tol) and (rel_error < rel_tol):
                 break
-            else:
-                self.add_term()
-                num_iter += 1
+            self.add_term()
+            num_iter += 1
+            yprev = yt
 
     def extend_to_x(self, x, curve_tol=1e-8, rel_tol=1e-2):
         r"""Extend the series to accurately determine the y-values at `x`.
@@ -996,360 +1009,3 @@ class PuiseuxTSeries(object):
         else:
             terms = self.terms
         return sum(alpha*t**n for n,alpha in terms)
-
-
-# class PuiseuxXSeries(AlgebraElement):
-#     r"""A Puiseux x-series centered at :math:`x = x_0`.
-
-#     A Puiseux series :math:`p(x)` centered at :math:`x = x_0` is a
-#     series of the form
-
-#     .. math::
-
-#         p(x) = \sum_{h=0}^\infty \alpha_h (x - x_0)^{n_h/e},
-
-#     The primary reference for the notation and computational method of
-#     these Puiseux series is D. Duval.
-
-#     Attributes
-#     ----------
-#     valuation
-#     prec
-#     center
-
-#     Methods
-#     -------
-#     eval
-#     evalf
-#     exponents
-#     coefficients
-#     list
-#     is_zero
-
-#     """
-#     @property
-#     def ramification_index(self):
-#         return self.__e
-
-#     @property
-#     def center(self):
-#         return self.__a
-
-#     @property
-#     def order(self):
-#         return self.prec()
-
-#     @property
-#     def laurent_part(self):
-#         return self.__f
-
-#     @property
-#     def terms(self):
-#         coeffs = self.__f.list()
-#         u = self.__f.valuation()
-#         terms = []
-#         for n in range(len(coeffs)):
-#             coeff = coeffs[n]
-#             if coeff:
-#                 terms.append(((n-u)/self.__e,coeff))
-
-#         # if there are no non-zero terms, return (0,0). this is important in
-#         # some algorithms
-#         if not terms:
-#             terms = [(0,0)]
-#         return terms
-
-#     def __init__(self, f, a=0, e=1, order=None):
-#         r"""Initialize a Puiseux series.
-
-#         The input :math:`f` is a Laurent series
-
-#         .. math::
-
-#             f = \sum \alpha_n t^n,
-
-#         where :math:`a` and :math:`e` are such that
-
-#         .. math::
-
-#             t = (x-a)^{1/e}.
-
-#         Thus, the Puiseux series
-
-#         .. math::
-
-#             f = \sum \alpha_n (x - a)^{n/e}
-
-#         is constructed.
-
-#         Parameters
-#         ----------
-#         f : Laurent series
-#             A laurent series in :math:`t = (x - a)^{1/e}`.
-#         a : complex
-#             The center of the Puiseux series.
-#         e : integer
-#             The ramification index of the Puiseux series.
-
-#         """
-#         # coerce input to laurent series
-#         if isinstance(f, PuiseuxXSeries):
-#             a = f.__a
-#             e = f.__e
-#             f = f.__f
-#             t = f.parent().gen()
-#         elif not isinstance(f, LaurentSeries):
-#             raise ValueError('%s must be a Laurent series.'%f)
-
-#         t = f.parent().gen()
-
-#         # handle negative exponent
-#         if e < 0:
-#             e = -e
-#             f = f(t=t**(-1))
-
-#         # handle order: assumed that order is O((x-a)**order) = O(t**(order*e))
-#         if order:
-#             f += O(t**order)
-
-#         AlgebraElement.__init__(self, f.parent())
-#         self._parent = f.parent()
-#         self.__f = f
-#         self.__e = QQ(e)
-#         self.__a = self._parent(a)
-
-#     def _repr_(self):
-#         # TODO: the variable 'x' is hard-coded throughout. this should
-#         # obviously change once a PuiseuxSeriesRing object is created
-#         if self.is_zero():
-#             if self.prec() == infinity:
-#                 return "0"
-#             else:
-#                 return "O(%s^%s)"%(self._parent.variable_name(),self.prec())
-#         s = " "
-#         v = self.__f.list()  # coefficient list
-#         valuation = self.valuation()
-#         m = len(v)
-#         if self.__a:
-#             X = '(x - %s)'%(self.__a)
-#         else:
-#             X = 'x'
-
-#         # print each term
-#         atomic_repr = self._parent.base_ring()._repr_option('element_is_atomic')
-#         first = True
-#         for n in xrange(m):
-#             x = v[n]
-#             e = QQ(n)/self.__e + valuation
-#             x = str(x)
-#             if x != '0':
-#                 if not first:
-#                     s += " + "
-#                 if ((not atomic_repr) and
-#                     (x[1:].find("+") != -1 or x[1:].find("-") != -1)):
-#                     x = "(%s)"%x
-#                 if e == 1:
-#                     var = "*%s"%X
-#                 elif e == 0:
-#                     var = ""
-#                 else:
-#                     if e.denominator() == 1:
-#                         var = "*%s^%s"%(X,e)
-#                     else:
-#                         var = "*%s^(%s)"%(X,e)
-#                 s += "%s%s"%(x,var)
-#                 first = False
-
-#         # bigoh
-#         if self.prec() == 0:
-#             bigoh = "O(1)"
-#         elif self.prec() == 1:
-#             #            bigoh = "O(%s)"%self._parent.variable_name()
-#             bigoh = "O(x)"
-#         else:
-#             bigoh = "O(%s^%s)"%(X,self.prec())
-#         if self.prec() != infinity:
-#             if s == " ":
-#                 return bigoh
-#             s += " + %s"%bigoh
-
-#         # clean up
-#         s = s.replace(" + -", " - ")
-#         s = s.replace(" - -", " + ")
-#         s = s.replace(" 1*"," ")
-#         s = s.replace(" -1*", " -")
-#         return s[1:]
-
-#     def _common_ramification_index(self, right):
-#         r"""Returns a ramification index common to self and right.
-
-#         In order to perform arithmetic on Puiseux series it is useful to find a
-#         common ramification index between two operands. That is, given Puiseux
-#         series :math:`p` and :math:`q` of ramification indices :math:`e` and
-#         :math:`f` we write both as series :math:`\tilde{f}` and
-#         :math:`\tilde{g}` in :math:`(x-a)^(1/g)` such that,
-
-#         .. math::
-
-#             f = \tilde{f}((x-a)^M), g = \tilde{g}((x-a)^N).
-
-#         Parameters
-#         ----------
-#         right : PuiseuxXSeries
-
-#         Returns
-#         -------
-#         g : int
-#             A ramification index common to self and right.
-#         M, N : int
-#             Scaling factors on self and right, respectively.
-
-#         """
-#         m = self.__e
-#         n = right.__e
-#         g = gcd(QQ(1)/m,QQ(1)/n).denominator()
-#         M = g/m
-#         N = g/n
-#         return g, M, N
-
-#     def __eq__(self, right):
-#         f1 = self.__f
-#         f2 = right.__f
-
-#         if self.__a != right.__a:
-#             return False
-#         if self.__e != right.__e:
-#             g, M, N = self._common_ramification_index(right)
-#             t = self.parent().gen()
-#             f1 = self.__f(t**M)
-#             f2 = right.__f(t**N)
-#         if f1 != f2:
-#             return False
-#         return True
-
-#     def _call_(self, x):
-#         t = (x-self.__a)**(1/self.__e)
-#         return f(t)
-
-#     def _add_(self, right):
-#         # TODO: make it work for objects other than Puiseux series
-#         if self.__a != right.__a:
-#             raise ValueError('Can only add puiseux series with the same center.')
-
-#         # find a common ramification index
-#         t = self.parent().gen()
-#         g, M, N = self._common_ramification_index(right)
-#         f1 = self.__f(t**M)
-#         f2 = right.__f(t**N)
-
-#         # add
-#         f = self._parent(f1 + f2)
-#         return PuiseuxXSeries(f, self.__a, g)
-
-#     def _sub_(self, right):
-#         # TODO: make it work for objects other than Puiseux series
-#         if self.__a != right.__a:
-#             raise ValueError('Can only subtract puiseux series with the same center.')
-
-#         # find a common ramification index
-#         t = self.parent().gen()
-#         g, M, N = self._common_ramification_index(right)
-#         f1 = self.__f(t=t**M)
-#         f2 = right.__f(t=t**N)
-#         f = self._parent(f1 - f2)
-#         return PuiseuxXSeries(f, self.__a, g)
-
-#     def _mul_(self, right):
-#         # TODO make it work for objects other than Puiseux series
-#         if self.__a != right.__a:
-#             raise ValueError('Can only multiply puiseux series with the same center.')
-
-#         # find a common ramification index
-#         t = self.parent().gen()
-#         g, M, N = self._common_ramification_index(right)
-#         f1 = self.__f(t**M)
-#         f2 = right.__f(t**N)
-#         f = self._parent(f1 * f2)
-#         return PuiseuxXSeries(f, self.__a, g)
-
-#     def _div_(self, right):
-#         # TODO make it work for objects other than Puiseux series
-#         if self.__a != right.__a:
-#             raise ValueError('Can only add puiseux series with the same center.')
-
-#         # find a common ramification index
-#         t = self.parent().gen()
-#         g, M, N = self._common_ramification_index(right)
-#         f1 = self.__f(t**M)
-#         f2 = right.__f(t**N)
-#         f = self._parent(f1 / f2)
-#         return PuiseuxXSeries(f, self.__a, g)
-
-#     def _neg_(self):
-#         return PuiseuxXSeries(self._parent(-self.__f), self.__a, self.__e)
-
-#     def __pow__(self, r):
-#         if r == 0:
-#             return PuiseuxXSeries(self._parent(1), self.__a, self.__e)
-
-#         f = self.__f**r
-#         return PuiseuxXSeries(f, self.__a, self.__e)
-
-#     def eval(self, x):
-#         t = (x - self.__a)**(1/self.__e)
-#         return self.__f(xe)
-
-#     def evalf(self, x, **kwds):
-#         return self.eval(x).n(**kwds)
-
-#     def valuation(self):
-#         val = self.__f.valuation()/self.__e
-#         if val == infinity:
-#             val = 0
-#         return val
-
-#     def prec(self):
-#         if self.__f.prec() == infinity:
-#             return infinity
-#         else:
-#             return QQ(self.__f.prec())/self.__e
-
-#     def coefficients(self):
-#         return self.__f.coefficients()
-
-#     def exponents(self):
-#         return map(lambda e: e/self.__e, self.__f.exponents())
-
-#     def is_zero(self):
-#         return self.__f.is_zero()
-
-#     def variable(self):
-#         return self.__f.variable()
-
-#     def list(self):
-#         return self.__f.list()
-
-#     def exponents(self):
-#         return map(lambda e: QQ(e)/self.__e, self.__f.exponents())
-
-#     def parent(self):
-#         return self.__f.parent()
-
-#     def change_ring(self, R):
-#         return PuiseuxXSeries(self.__f.change_ring(R), self.__a, self.__e)
-
-
-if __name__ == '__main__':
-    R = QQ['x,y']
-    x,y = R.gens()
-    f = y**3 - 2*x**3*y + x**7
-
-    p = puiseux(f,0)
-    p[1].add_term()
-    p[1].add_term()
-    p[1].add_term()
-    p[1].add_term()
-    px = p[1].xseries()[0]
-    print '\npx =', px
-    print 'computing pxs...'
-    pxs = px.change_ring(SR)

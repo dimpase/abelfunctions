@@ -455,3 +455,49 @@ class TestPuiseux(AbelfunctionsTestCase):
 #         pass
 
 
+class TestEvaluation(AbelfunctionsTestCase):
+
+    def test_extend_to_t(self):
+        p = puiseux(self.f2,0)
+        pi = p[0]
+        ti = 0.1
+
+        # 1e-8
+        pi.extend_to_t(ti, 1e-8)
+        xt = pi.eval_x(ti)
+        yt = pi.eval_y(ti)
+        error = abs(self.f2(xt,yt))
+        self.assertLess(error, 1e-8)
+
+        # 1e-14
+        pi.extend_to_t(ti, curve_tol=1e-14)
+        xt = pi.eval_x(ti)
+        yt = pi.eval_y(ti)
+        error = abs(self.f2(xt,yt))
+        self.assertLess(error, 1e-14)
+
+        # 1e-20 (multi-precise)
+        pi.extend_to_t(ti, curve_tol=1e-20)
+        xt = pi.eval_x(ti)
+        yt = pi.eval_y(ti)
+        error = abs(self.f2(xt,yt))
+        self.assertLess(error, 1e-20)
+
+    def test_extend_to_t_oo(self):
+        p = puiseux(self.f2,'oo')
+        pi = p[0]
+        ti = 50
+
+        # 1e-8
+        pi.extend_to_t(ti, 1e-8)
+        xt = pi.eval_x(ti)
+        yt = pi.eval_y(ti)
+        error = abs(self.f2(xt,yt))
+        self.assertLess(error, 1e-8)
+
+        # 1e-14
+        pi.extend_to_t(ti, curve_tol=1e-14)
+        xt = pi.eval_x(ti)
+        yt = pi.eval_y(ti)
+        error = abs(self.f2(xt,yt))
+        self.assertLess(error, 1e-14)
