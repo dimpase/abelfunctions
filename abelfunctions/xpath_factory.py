@@ -12,7 +12,7 @@ import sympy
 import networkx as nx
 import matplotlib.pyplot as plt
 
-import pdb
+from sage.all import infinity, QQbar
 
 class XPathFactory(object):
     """X-paths are lists of tuples representing straight line segments `(z0,
@@ -104,9 +104,10 @@ class XPathFactory(object):
             A discriminant point of the algebraic curve.
 
         """
-        if isinstance(bi, sympy.Expr):
+        try:
+            bi = QQbar(bi)
             exact = True
-        else:
+        except TypeError:
             bi = numpy.complex(bi)
             exact = False
         return self._radii[self.discriminant_points(exact=exact) == bi][0]
@@ -114,10 +115,9 @@ class XPathFactory(object):
     def discriminant_points(self, exact=False):
         r"""Returns the ordered discriminant points of the curve.
 
-        The discriminant points are ordered by increasing argument with
-        the base point. Exact (`sympy.Expr`) or numerical approximations
-        to these discriminant points can be retrieved by setting the
-        `exact` keyword.
+        The discriminant points are ordered by increasing argument with the
+        base point. Exact or numerical approximations to these discriminant
+        points can be retrieved by setting the `exact` keyword.
 
         Parameters
         ----------
@@ -181,7 +181,7 @@ class XPathFactory(object):
 
         """
         # special case when going around infinity.
-        if bi == sympy.oo:
+        if bi == infinity:
             return self.xpath_around_infinity(nrots=nrots)
 
         xpath_to_bi = self.xpath_to_discriminant_point(bi)

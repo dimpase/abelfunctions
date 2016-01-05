@@ -9,14 +9,13 @@ the Riemann surface.
 """
 import numpy
 import scipy
-import sympy
 import networkx as nx
 import matplotlib
 import matplotlib.pyplot as plt
 
 from operator import itemgetter
-from .utilities import Permutation
-from .singularities import genus
+from abelfunctions.utilities import Permutation
+from abelfunctions.singularities import genus
 
 
 def find_cycle(pi, j):

@@ -40,18 +40,15 @@ cdef class UnivariatePolynomial:
     eval(complex z)
         Evaluate the polynomial at the complex point `z`.
     """
-    def __cinit__(self,f,x):
+    def __cinit__(self,f):
         """Initialize a UnivariatePolynomial from a SymPy Poly.
 
         Parameters
         ----------
-        f : SymPy Poly
-        x : SymPy symbol
-            The polynomial and its independent varaible.
+        f : univariate polynomail
         """
         cdef int n
-        f = f.as_poly(x)
-        coeffs = numpy.array(f.all_coeffs(),dtype=complex)
+        coeffs = numpy.array(f.coefficients(sparse=True),dtype=complex)
         self.deg = len(coeffs) - 1
         self.c = coeffs
 
@@ -127,7 +124,7 @@ cdef class MultivariatePolynomial:
     eval(complex z)
         Evaluate the polynomial at the complex point `z`.
     """
-    def __cinit__(self,f,x,y):
+    def __cinit__(self,f):
         """Initialize a MultivariatePolynomial from a SymPy Poly.
 
         Parameters
@@ -140,8 +137,10 @@ cdef class MultivariatePolynomial:
             coefficients are polynomials in `x`.
         """
         cdef int n
-        f = f.as_poly(y)
-        coeffs = f.all_coeffs()
+        R = f.parent()
+        x,y = R.gens()
+        f = f.polynomial(y)
+        coeffs = f.coefficients(sparse=True)
         self.deg = len(coeffs) - 1
         self.c = numpy.array(
             [UnivariatePolynomial(coeff,x) for coeff in coeffs],

@@ -3,8 +3,6 @@ from .riemann_surface_path cimport RiemannSurfacePathPrimitive
 
 cdef class RiemannSurface:
     cdef object _f
-    cdef object _x
-    cdef object _y
     cdef int _deg
     cdef object _base_point
     cdef object _base_place

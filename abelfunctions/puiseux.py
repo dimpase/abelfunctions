@@ -481,7 +481,7 @@ def puiseux(f, alpha, beta=None, order=None, parametric=True):
         F = f(1/x,y)*x**d
         n,d = F.numerator(), F.denominator()
         falpha,_ = n.polynomial(x).quo_rem(d.univariate_polynomial())
-        falpha = R(falpha)
+        falpha = falpha(x).numerator()
     else:
         falpha = f(x+alpha,y)
 
@@ -953,8 +953,11 @@ class PuiseuxTSeries(object):
         val = complex
 
         """
-        center, xcoefficient, ramification_index = self.xdata
-        val = center + xcoefficient*t**ramification_index
+        try:
+            center, xcoefficient, ramification_index = self.xdata
+            val = center + xcoefficient*t**ramification_index
+        except ZeroDivisionError:
+            val = infinity
         return val
 
     def eval_dxdt(self, t):
@@ -968,8 +971,11 @@ class PuiseuxTSeries(object):
         -------
         val : complex
         """
-        center, xcoefficient, ramification_index = self.xdata
-        val = xcoefficient*ramification_index*t**(ramification_index-1)
+        try:
+            center, xcoefficient, ramification_index = self.xdata
+            val = xcoefficient*ramification_index*t**(ramification_index-1)
+        except ZeroDivisionError:
+            val = infinity
         return val
 
     def eval_y(self, t, order=None):
@@ -1008,4 +1014,9 @@ class PuiseuxTSeries(object):
             terms = [(n,alpha) for n,alpha in self.terms if n < order]
         else:
             terms = self.terms
-        return sum(alpha*t**n for n,alpha in terms)
+
+        try:
+            val = sum(alpha*t**n for n,alpha in terms)
+        except ZeroDivisionError:
+            val = infinity
+        return val

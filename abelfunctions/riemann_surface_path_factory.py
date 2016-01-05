@@ -22,26 +22,25 @@ Authors
 
 """
 
-import pdb
-
 import numpy
 import scipy
 import scipy.linalg as linalg
-import sympy
 
-from .riemann_surface_path import (
+from abelfunctions.riemann_surface_path import (
     RiemannSurfacePathPrimitive,
     RiemannSurfacePath,
     RiemannSurfacePathArc,
     RiemannSurfacePathLine,
     RiemannSurfacePathRay,
     )
-from .utilities import (
+from abelfunctions.utilities import (
     Permutation,
     matching_permutation,
     )
-from .xpath_factory import XPathFactory, XPathFactoryAbel
-from .ypath_factory import YPathFactory
+from abelfunctions.xpath_factory import XPathFactory, XPathFactoryAbel
+from abelfunctions.ypath_factory import YPathFactory
+
+from sage.all import infinity
 
 class RiemannSurfacePathFactory(object):
     r"""Factory class for constructing paths on the Riemann surface.
@@ -372,7 +371,7 @@ class RiemannSurfacePathFactory(object):
             phi_prod = reduce(lambda phi1,phi2: phi2*phi1, permutations)
             phi_prod = phi_prod * phi_oo
             if phi_prod.is_identity():
-                branch_points.append(sympy.oo)
+                branch_points.append(infinity)
                 permutations.append(phi_oo)
             else:
                 raise ValueError('Contradictory permutation at infinity.')

@@ -9,21 +9,20 @@ Authors
 """
 
 import numpy
-import sympy
 import scipy
-import scipy.integrate
 import scipy.linalg
 
-from .differentials import differentials
-from .differentials import Differential
-from .differentials cimport Differential
-from .divisor import Place, DiscriminantPlace, RegularPlace, Divisor
-from .puiseux import puiseux
-from .riemann_surface_path import RiemannSurfacePathPrimitive
-from .riemann_surface_path cimport RiemannSurfacePathPrimitive
-from .riemann_surface_path_factory import RiemannSurfacePathFactory
-from .singularities import genus
-from .utilities import rootofsimp
+from abelfunctions.differentials import differentials
+from abelfunctions.differentials import Differential
+from abelfunctions.differentials cimport Differential
+from abelfunctions.divisor import Place, DiscriminantPlace, RegularPlace, Divisor
+from abelfunctions.puiseux import puiseux
+from abelfunctions.riemann_surface_path import RiemannSurfacePathPrimitive
+from abelfunctions.riemann_surface_path cimport RiemannSurfacePathPrimitive
+from abelfunctions.riemann_surface_path_factory import RiemannSurfacePathFactory
+from abelfunctions.singularities import genus
+
+from sage.all import QQbar, infinity
 
 
 cdef class RiemannSurface:
@@ -39,12 +38,6 @@ cdef class RiemannSurface:
     property f:
         def __get__(self):
             return self._f
-    property x:
-        def __get__(self):
-            return self._x
-    property y:
-        def __get__(self):
-            return self._y
     property deg:
         def __get__(self):
             return self._deg
@@ -52,15 +45,13 @@ cdef class RiemannSurface:
         def __get__(self):
             return self.PathFactory
 
-    def __init__(self, f, x, y, base_point=None, base_sheets=None, kappa=2./5):
+    def __init__(self, f, base_point=None, base_sheets=None, kappa=2./5):
         """Construct a Riemann surface.
 
         Parameters
         ----------
-        f : sympy.Expression
+        f : curve
             The algebraic curve representing the Riemann surface.
-        x,y : sympy.Symbol
-            The dependent and independent variables, respectively.
         base_point : complex, optional
             A custom base point for the Monodromy group.
         base_sheets : complex list, optional
@@ -70,10 +61,11 @@ cdef class RiemannSurface:
             define the radii of the x-path circles around the curve's
             branch points.
         """
+        f = f.change_ring(QQbar)
+        R = f.parent()
+        x,y = R.gens()
         self._f = f
-        self._x = x
-        self._y = y
-        self._deg = sympy.degree(f,y)
+        self._deg = f.degree(y)
 
         # set custom base point, if provided. otherwise, base_point is
         # set by self.discriminant_points()
@@ -120,38 +112,44 @@ cdef class RiemannSurface:
 
         """
         # alpha = infinity case
-        infinities = ['oo', sympy.oo, numpy.Inf]
+        infinities = [infinity, 'oo', numpy.Inf]
         if alpha in infinities:
-            p = puiseux(self.f, self.x, self.y, sympy.oo,
-                        parametric=True, exact=True)
+            alpha = infinity
+            p = puiseux(self.f, alpha)
             return [DiscriminantPlace(self, pi) for pi in p]
 
-        # first coerce b into an exact discriminant point if it's
-        # epsilon close to one
-        exact = isinstance(alpha,sympy.Expr) or isinstance(alpha,int)
+        # if alpha is epsilon close to a discriminant point then set it exactly
+        # equal to that discriminant point. there is usually no reason to
+        # compute a puiseux series so close to a discriminant point
+        try:
+            alpha = QQbar(alpha)
+            exact = True
+        except TypeError:
+            alpha = numpy.complex(alpha)
+            exact = False
         b = self.closest_discriminant_point(alpha,exact=exact)
-        if abs(numpy.complex(alpha) - numpy.complex(b)) < 1e-12:
-            # return discriminant places corresponding to x=alpha y=beta
-            p = puiseux(self.f,self.x,self.y,b,beta=beta,
-                        parametric=True,exact=exact)
+
+        # if alpha is equal to or close to a discriminant point then return a
+        # discriminant place
+        if abs(alpha - b) < 1e-12:
+            p = puiseux(self.f, b, beta)
             return [DiscriminantPlace(self, pi) for pi in p]
 
-        # return a regular place if far enough away from a
-        # discriminant point
+        # otherwise, return a regular place if far enough away
         if not beta is None:
-            # sanity check that the place is on the curve
-            curve_eval = self.f.evalf(subs={self.x:alpha, self.y:beta})
+            curve_eval = self.f(alpha, beta)
             if abs(curve_eval) > 1e-8:
-                raise ValueError('The place (%s, %s) does not lie on '
-                                 'the curve / surface.')
+                raise ValueError('The place (%s, %s) does not lie on the curve '
+                                 '/ surface.')
             return RegularPlace(self, alpha, beta)
 
-        # otherwise, compute the roots above x=alpha and return a list
-        # of places
-        _y = sympy.Symbol('_'+str(self.y))
-        falpha = self.f.subs({self.x:alpha,self.y:_y}).as_poly(_y)
-        yroots = falpha.all_roots(radicals=False)
-        return [RegularPlace(self,alpha,beta) for beta in yroots]
+        # if a beta (y-coordinate) is not specified then return all places
+        # lying above x=alpha
+        R = self.f.parent()
+        x,y = R.gens()
+        falpha = self.f(alpha,y)
+        yroots = falpha.roots(ring=QQbar, multiplicities=False)
+        return [RegularPlace(self, alpha, beta) for beta in yroots]
 
     def show_paths(self, ax=None, *args, **kwds):
         """Plots all of the monodromy paths of the curve.
@@ -205,13 +203,10 @@ cdef class RiemannSurface:
 
         # compute the symbolic and numerical discriminant points
         f = self.f
-        x = self.x
-        y = self.y
-        p = sympy.Poly(f,[x,y])
-        _x = sympy.Symbol('_'+str(x))
-        res = sympy.resultant(p,p.diff(y),y).subs(x,_x).as_poly(_x)
-        rts = res.all_roots(multiple=False, radicals=False)
-        rts, multiplicities = zip(*rts)
+        x,y = f.parent().gens()
+        p = f
+        res = p.resultant(p.deriviative(y),y)
+        rts = res.roots(ring=QQbar, multiplicities=False)
         discriminant_points_exact = numpy.array(rts)
         discriminant_points = discriminant_points_exact.astype(numpy.complex)
 
@@ -263,7 +258,9 @@ cdef class RiemannSurface:
         # apart then we're screwed, anyway.
         x = numpy.complex(x)
         idx = numpy.argmin(numpy.abs(bf - x))
-        return b[idx]
+        if exact:
+            return b[idx]
+        return bf[idx]
 
     # Monodromy: expose some methods / properties of self.Monodromy
     # without subclassing (since it doesn't make sense that a Riemann
@@ -271,7 +268,7 @@ cdef class RiemannSurface:
     def monodromy_group(self):
         r"""Returns the monodromy group of the underlying curve.
 
-	The monodromy group is represented by a list of four items:
+	    The monodromy group is represented by a list of four items:
 
         * `base_point` - a point in the complex x-plane where every monodromy
           path begins and ends,
@@ -378,9 +375,8 @@ cdef class RiemannSurface:
         list, HolomorphicDifferential
 
         """
-        f,x,y = self.f, self.x, self.y
         if not self._holomorphic_differentials:
-            self._holomorphic_differentials = differentials(self)
+            self._holomorphic_differentials = differentials(self.f)
         return self._holomorphic_differentials
 
     def holomorphic_oneforms(self):
@@ -389,7 +385,7 @@ cdef class RiemannSurface:
 
     def genus(self):
         if not self._genus:
-            self._genus = genus(self.f,self.x,self.y)
+            self._genus = genus(self.f)
         return self._genus
 
     def a_cycles(self):
@@ -512,27 +508,3 @@ cdef class RiemannSurface:
         B = tau[:,g:]
         self._riemann_matrix = numpy.dot(scipy.linalg.inv(A), B)
         return self._riemann_matrix
-
-
-
-
-if __name__ == '__main__':
-    import sympy
-    from sympy.abc import x,y
-
-    f0 = y**3 - 2*x**3*y - x**8
-    f1 = (x**2 - x + 1)*y**2 - 2*x**2*y + x**4
-    f2 = -x**7 + 2*x**3*y + y**3
-    f3 = (y**2-x**2)*(x-1)*(2*x-3) - 4*(x**2+y**2-2*x)**2
-    f4 = y**2 + x**3 - x**2
-    f5 = (x**2 + y**2)**3 + 3*x**2*y - y**3
-    f6 = y**4 - y**2*x + x**2
-    f7 = y**3 - (x**3 + y)**2 + 1
-    f8 = (x**6)*y**3 + 2*x**3*y - 1
-    f9 = 2*x**7*y + 2*x**7 + y**3 + 3*y**2 + 3*y
-    f10 = (x**3)*y**4 + 4*x**2*y**2 + 2*x**3*y - 1
-    f11 = y**2 - (x-2)*(x-1)*(x+1)*(x+2)
-    f12 = x**4 + y**4 - 1
-
-    f = f2
-    X = RiemannSurface(f, x, y)

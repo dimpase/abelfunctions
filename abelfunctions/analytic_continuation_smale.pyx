@@ -35,13 +35,12 @@ cimport cython
 import numpy
 cimport numpy
 import scipy
-import sympy
 
-from .analytic_continuation cimport AnalyticContinuator
-from .differentials cimport Differential
-from .riemann_surface cimport RiemannSurface
-from .riemann_surface_path cimport RiemannSurfacePathPrimitive
-from .polynomials cimport MultivariatePolynomial
+from abelfunctions.analytic_continuation cimport AnalyticContinuator
+from abelfunctions.differentials cimport Differential
+from abelfunctions.riemann_surface cimport RiemannSurface
+from abelfunctions.riemann_surface_path cimport RiemannSurfacePathPrimitive
+from abelfunctions.polynomials cimport MultivariatePolynomial
 
 cdef extern from "math.h":
     double sqrt(double)
@@ -238,8 +237,10 @@ cdef class AnalyticContinuatorSmale(AnalyticContinuator):
     """
     def __init__(self, RiemannSurface RS, RiemannSurfacePathPrimitive gamma):
         cdef int deg = RS.deg
+        f = RS.f
+        x,y = f.parent().gens()
         self.df = numpy.array(
-            [MultivariatePolynomial(sympy.diff(RS.f,RS.y,k),RS.x,RS.y)
+            [MultivariatePolynomial(RS.f.derivative(y,k))
             for k in range(deg+1)],
             dtype=MultivariatePolynomial)
         AnalyticContinuator.__init__(self, RS, gamma)

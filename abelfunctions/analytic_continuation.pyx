@@ -30,13 +30,14 @@ cimport cython
 import numpy
 cimport numpy
 import scipy
-import sympy
 
 from .divisor import Place, DiscriminantPlace
 from .puiseux import puiseux
 from .riemann_surface cimport RiemannSurface
 from .riemann_surface_path cimport RiemannSurfacePathPrimitive
 from .utilities import matching_permutation
+
+from sage.all import CC, QQbar, infinity
 
 cdef extern from 'complex.h':
     double creal(complex)
@@ -148,7 +149,7 @@ cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
         The Riemann surface on which analytic continuation takes place
     gamma : RiemannSurfacePathPrimitive
         The path along which the analytic continuation is performed.
-    center : sympy.Expr
+    center : complex or infinity
         The center of the Puiseux series expansions. Usually a discriminant
         point of the underlying curve of the Riemann surface.
     puiseux_series : list, PuiseuxXSeries
@@ -170,6 +171,7 @@ cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
         AnalyticContinuator.__init__(self, RS, gamma)
         self._target_place = None
         self.center = discriminant_point
+        self.alpha = 0  # overwritten in _self._compute_puisuex_series
         self.puiseux_series = self._compute_puiseux_series(gamma)
 
     def _compute_puiseux_series(self, gamma, epsilon=1e-8):
@@ -210,21 +212,22 @@ cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
         f = self.RS.f
         x = self.RS.x
         y = self.RS.y
-        a = gamma.x0
-        P = puiseux(f,x,y,self.center,parametric=True,exact=True)
+        x0 = gamma.x0
+        P = puiseux(f, self.center)
 
         # compute enouge terms of each Puiseux series to accurately capture the
         # y-roots at x=a
         for Pi in P:
-            Pi.extend_to_x(a,curve_tol=epsilon)
+            Pi.extend_to_x(x0, curve_tol=epsilon)
 
         # now that we have sufficiently many terms we compute the corresponding
         # x-series and reorder them according to the ordering of the incoming
         # regular places roots
+        alpha = 0 if self.center == infinity else self.center
         px = [[pxi for pxi in Pi.xseries(all_conjugates=True)] for Pi in P]
         ramification_indices = [Pi.ramification_index for Pi in P]
         p = [pxi for sublist in px for pxi in sublist]
-        py = numpy.array([pj.evalf(a) for pj in p], dtype=numpy.complex)
+        py = numpy.array([pj(x0-alpha) for pj in p], dtype=numpy.complex)
         sigma = matching_permutation(py, gamma.y0)
         p = sigma.action(p)
 
@@ -247,7 +250,8 @@ cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
 
         cdef complex[:] yipi
         # simply evaluate the ordered puiseux series at xip1
-        yip1 = numpy.array([pj.evalf(xip1) for pj in self.puiseux_series],
+        alpha = 0 if self.center == infinity else self.center
+        yip1 = numpy.array([pj(xip1-alpha) for pj in self.puiseux_series],
                            dtype=numpy.complex)
         return yip1
 
@@ -275,9 +279,8 @@ cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
         """
         # localize the differential at the discriminant place
         P = self._target_place
-        t = P.t
-        omega_local = omega.localize(P).n()
-        omega_local = sympy.lambdify(t,omega_local,'numpy')
+        omega_local = omega.localize(P)
+        omega_local = omega_local.change_ring(CC)
 
         # extract relevant information about the Puiseux series
         p = P.puiseux_series
@@ -293,7 +296,7 @@ cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
         tprim = numpy.complex((x0-center)/xcoefficient)**(1./e)
         unity = [numpy.exp(2.j*numpy.pi*k/abs(e)) for k in range(abs(e))]
         tall = [unity[k]*tprim for k in range(abs(e))]
-        ytprim = numpy.array([p.eval_y(tk) for tk in tall],dtype=numpy.complex)
+        ytprim = numpy.array([p.eval_y(tk) for tk in tall], dtype=numpy.complex)
         k = numpy.argmin(numpy.abs(ytprim - y0))
         tcoefficient = tall[k]
 
