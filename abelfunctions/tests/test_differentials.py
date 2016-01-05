@@ -20,7 +20,7 @@ class TestDifferentialsNumerators(AbelfunctionsTestCase):
     def test_f2(self):
         x,y = self.f2.parent().gens()
         a = differentials_numerators(self.f2)
-        b = [x**3, x*y]
+        b = [x*y, x**3]
         self.assertEqual(a,b)
 
     def test_f4(self):
@@ -38,11 +38,11 @@ class TestDifferentialsNumerators(AbelfunctionsTestCase):
     def test_f7(self):
         x,y = self.f7.parent().gens()
         a = differentials_numerators(self.f7)
-        b = [1, x, x**2, y]
+        b = [1, y, x, x**2]
         self.assertEqual(a,b)
 
     def test_f8(self):
         x,y = self.f8.parent().gens()
         a = differentials_numerators(self.f8)
-        b = [y, x*y, x*y**4]
+        b = [y, x*y**3, x*y**4]
         self.assertEqual(a,b)
