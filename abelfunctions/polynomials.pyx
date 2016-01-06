@@ -10,11 +10,12 @@ Authors
 * Chris Swierczewski (April 2014)
 """
 
+from sage.all import CC
+
 import numpy
 cimport numpy
 cimport cython
 
-from sage.all import CC
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -77,7 +78,7 @@ cdef class UnivariatePolynomial:
                 s += '%s*x**%d + '%(cn,self.deg-n)
         return s
 
-    cdef complex eval(self, complex z) nogil:
+    cdef complex eval(self, complex z):
         """Evaluate the polynomial at the complex point `z`.
 
         Parameters

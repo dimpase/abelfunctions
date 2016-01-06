@@ -1,7 +1,7 @@
 cdef class UnivariatePolynomial:
     cdef int deg
     cdef complex[:] c
-    cdef complex eval(self, complex) nogil
+    cdef complex eval(self, complex)
 
 cdef class MultivariatePolynomial:
     cdef int deg

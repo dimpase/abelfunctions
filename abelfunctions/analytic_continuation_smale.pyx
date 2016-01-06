@@ -43,6 +43,8 @@ from abelfunctions.riemann_surface cimport RiemannSurface
 from abelfunctions.riemann_surface_path cimport RiemannSurfacePathPrimitive
 from abelfunctions.polynomials cimport MultivariatePolynomial
 
+from sage.all import CC
+
 cdef extern from "math.h":
     double sqrt(double)
 
@@ -51,10 +53,10 @@ cdef extern from "complex.h":
     double cimag(complex)
     double cabs(complex)
 
-cdef double ABELFUNCTIONS_SMALE_ALPHA0 = 1.1884471871911697 #(13-2*sqrt(17))/4
+cdef double ABELFUNCTIONS_SMALE_ALPHA0 = 1.1884471871911697 # = (13-2*sqrt(17))/4
 
 
-cdef int factorial(int n) nogil:
+cdef int factorial(int n):
     """Fast evaluation of `n` factorial.
 
     Parameters
@@ -66,10 +68,9 @@ cdef int factorial(int n) nogil:
     :math:`n!`
     """
     cdef int k, nfac = 1
-    with nogil:
-        for k in range(1,n+1):
-            nfac *= k
-        return nfac
+    for k in range(1,n+1):
+        nfac *= k
+    return nfac
 
 
 @cython.boundscheck(False)
@@ -103,13 +104,15 @@ cdef complex newton(MultivariatePolynomial[:] df,
     cdef MultivariatePolynomial df1 = df[1]
     cdef complex step = 1.0
     cdef complex df1y
-    while cabs(step) > 1e-14:
+
+    while cabs(step) > 1e-12:
         # if df is not invertible then we are at a critical point.
+        print '\t\tstep =', cabs(step)
         df1y = df1.eval(xip1,yij)
         if cabs(df1y) < 1e-14:
             return yij
         step = df0.eval(xip1,yij)/df1y
-        yij -= step
+        yij = yij - step
     return yij
 
 
@@ -139,7 +142,8 @@ cdef double smale_beta(MultivariatePolynomial[:] df,
     """
     cdef MultivariatePolynomial df0 = df[0]
     cdef MultivariatePolynomial df1 = df[1]
-    return cabs(df0.eval(xip1,yij)/df1.eval(xip1,yij))
+    cdef double val = cabs(df0.eval(xip1,yij) / df1.eval(xip1,yij))
+    return val
 
 
 @cython.boundscheck(False)
@@ -238,12 +242,14 @@ cdef class AnalyticContinuatorSmale(AnalyticContinuator):
     """
     def __init__(self, RiemannSurface RS, RiemannSurfacePathPrimitive gamma):
         cdef int deg = RS.deg
-        f = RS.f
+        cdef MultivariatePolynomial[:] df
+
+        f = RS.f.change_ring(CC)
         x,y = f.parent().gens()
-        self.df = numpy.array(
-            [MultivariatePolynomial(f.derivative(y,k))
-            for k in range(deg+1)],
-            dtype=MultivariatePolynomial)
+        df = numpy.array([MultivariatePolynomial(f.derivative(y,k))
+                          for k in range(deg+1)],
+                         dtype=MultivariatePolynomial)
+        self.df = df
         AnalyticContinuator.__init__(self, RS, gamma)
 
     @cython.boundscheck(False)
@@ -269,11 +275,14 @@ cdef class AnalyticContinuatorSmale(AnalyticContinuator):
         complex[:]
             The y-fibre lying above `xip1`.
         """
+        print '=== Analytically continue ==='
+        print 'xi =', numpy.complex(xi)
+        print 'yi =', numpy.array(yi, dtype=complex)
         cdef int j,k
         cdef complex xiphalf
         cdef complex[:] yiphalf, yip1
         cdef complex yij, yik
-        cdef double betaij, betaik
+        cdef double betaij, betaik, distancejk
 
         # return the current fibre if the step size is too small
         if cabs(xip1-xi) < 1e-15:
@@ -282,43 +291,47 @@ cdef class AnalyticContinuatorSmale(AnalyticContinuator):
         # first determine if the y-fibre guesses are 'approximate
         # solutions'. if any of them are not then refine the step by
         # analytically continuing to an intermediate "time"
+        print '\t=check #1'
         for j in range(self.deg):
             yij = yi[j]
             if smale_alpha(self.df, xip1, yij) > ABELFUNCTIONS_SMALE_ALPHA0:
-#                print '      REFINE (approx. solns)'
                 xiphalf = (xi + xip1)/2.0
                 yiphalf = self.analytically_continue(xi, yi, xiphalf)
                 yip1 = self.analytically_continue(xiphalf, yiphalf, xip1)
-                return yip1
+                return numpy.array(yip1, dtype=complex)
 
         # next, determine if the approximate solutions will converge to
         # different associated solutions
+        print '\t=check #2'
         for j in range(self.deg):
             yij = yi[j]
             betaij = smale_beta(self.df, xip1, yij)
+            print '\t\tbetaij =', betaij
             for k in range(j+1, self.deg):
                 yik = yi[k]
                 betaik = smale_beta(self.df, xip1, yik)
-
-                if cabs(yij-yik) < 2*(betaij + betaik):
+                print '\t\tbetaik =', betaik
+                distancejk = cabs(yij-yik)
+                print '\t\tcheck: %f < %f'%(distancejk, 3*(betaij + betaik))
+                if distancejk < 2*(betaij + betaik):
                     # approximate solutions don't lead to distinct
                     # roots. refine the step by analytically continuing
                     # to an intermedite time
-#                    print '      REFINE (not distinct):', xi
-#                    print '                            ', numpy.array(yi, dtype=complex)
                     xiphalf = (xi + xip1)/2.0
                     yiphalf = self.analytically_continue(xi, yi, xiphalf)
-#                    print '                            ', numpy.array(yiphalf, dtype=complex)
                     yip1 = self.analytically_continue(xiphalf, yiphalf, xip1)
-                    return yip1
+                    return numpy.array(yip1, dtype=complex)
 
         # finally, since we know that we have approximate solutions that
         # will converge to difference associated solutions we will
         # Netwon iterate
-        yip1 = numpy.array(
-            [newton(self.df,xip1,yi[j]) for j in range(self.deg)],
-            dtype=complex)
-        return yip1
+        print '\t=newton:'
+        print '\t\t', numpy.array(yi, dtype=complex)
+        yip1 = numpy.zeros(self.deg, dtype=complex)
+        for j in range(self.deg):
+            yip1[j] = newton(self.df, xip1, yi[j])
+        print '\t...ancont DONE.'
+        return numpy.array(yip1, dtype=complex)
 
     def parameterize(self, Differential omega):
         r"""Returns the differential omega parameterized on the path.

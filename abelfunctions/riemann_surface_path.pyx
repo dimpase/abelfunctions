@@ -126,10 +126,17 @@ cdef class RiemannSurfacePathPrimitive:
         Note that the starting point must always be regular.
         """
         self._RS = RS
-        self._x0 = x0
-        self._y0 = y0
+        self._AC = None
+        self._x0 = numpy.complex(x0)
+        self._y0 = numpy.array(y0, dtype=complex)
         self._segments = numpy.array([self], dtype=RiemannSurfacePathPrimitive)
+        self._nsegments = 1
         self._ncheckpoints = ncheckpoints
+
+        self._tcheckpoints = numpy.zeros(ncheckpoints, dtype=numpy.double)
+        self._xcheckpoints = numpy.zeros(ncheckpoints, dtype=complex)
+        self._ycheckpoints = numpy.zeros((ncheckpoints,RS.deg), dtype=complex)        
+        
         if self._ncheckpoints > 0:
             self.set_analytic_continuator()
             self._initialize_checkpoints()
@@ -206,7 +213,7 @@ cdef class RiemannSurfacePathPrimitive:
         # set the analytic continuator by checking if the end of the
         # path is close to a discriminant point
         x_end = self.get_x(1.0)
-        b = self._RS.closest_discriminant_point(x_end, exact=True)
+        b = self._RS.closest_discriminant_point(x_end, exact=False)
         if numpy.abs(numpy.complex(b) - x_end) < 1e-12:
             self._AC = AnalyticContinuatorPuiseux(self._RS, self, b)
         else:
@@ -310,7 +317,7 @@ cdef class RiemannSurfacePathPrimitive:
 
         n = self._ncheckpoints
 #        tend = 1. - 1./(n+1)
-        tend = 1.0 - 1e-12
+        tend = 1.0
         t = numpy.linspace(0, tend, n)
         x = numpy.array([self.get_x(ti) for ti in t], dtype=complex)
         y = numpy.zeros((n, self._RS.deg), dtype=complex)

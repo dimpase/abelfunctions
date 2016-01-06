@@ -84,7 +84,7 @@ cdef class RiemannSurface:
         self._riemann_matrix = None
         self._genus = None
         self._holomorphic_differentials = None
-        self.PathFactory = RiemannSurfacePathFactory(self)
+        self.PathFactory = None #RiemannSurfacePathFactory(self)
         
     def __repr__(self):
         s = 'Riemann surface defined by f = %s'%(self.f)

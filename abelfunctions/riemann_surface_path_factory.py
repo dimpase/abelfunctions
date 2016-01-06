@@ -216,8 +216,8 @@ class RiemannSurfacePathFactory(object):
         gamma_P0_to_Q = self.path_to_place(Q)
 
         # construct the path going from Q to P
-        xend = gamma_P0_to_Q.get_x(1.0)
-        yend = gamma_P0_to_Q.get_y(1.0)
+        xend = numpy.complex(gamma_P0_to_Q.get_x(1.0))
+        yend = numpy.array(gamma_P0_to_Q.get_y(1.0), dtype=numpy.complex)
         gamma_Q_to_P = RiemannSurfacePathRay(self.RS, xend, yend)
         gamma = gamma_P0_to_Q + gamma_Q_to_P
         return gamma
@@ -259,9 +259,9 @@ class RiemannSurfacePathFactory(object):
 
         # construct the RiemannSurfacePath going from this regular place
         # to the discriminant point.
-        xend = gamma1.get_x(1.0)
-        yend = gamma1.get_y(1.0)
-        xdata = (a, center)
+        xend = numpy.complex(gamma1.get_x(1.0))
+        yend = numpy.array(gamma1.get_y(1.0), dtype=numpy.complex)
+        xdata = map(numpy.complex, (a, center))
         segment = RiemannSurfacePathLine(self.RS, xend, yend, *xdata)
         gamma = gamma1 + segment
         return gamma
@@ -304,7 +304,8 @@ class RiemannSurfacePathFactory(object):
         if sheet_index != 0:
             ypath = self.YPF.ypath_from_base_to_sheet(sheet_index)
             gamma_swap = self.RiemannSurfacePath_from_cycle(ypath)
-            ordered_base_sheets = gamma_swap.get_y(1.0)
+            ordered_base_sheets = numpy.array(gamma_swap.get_y(1.0),
+                                              dtype=numpy.complex)
 
             # take the new ordering of branch points and construct the
             # path to the target place. there is an inherent check that
@@ -350,7 +351,7 @@ class RiemannSurfacePathFactory(object):
             gamma = self.RiemannSurfacePath_from_xpath(xpath, x0, y0)
 
             # compute the end fibre and the corresponding permutation
-            yend = numpy.array(gamma.get_y(1.0))
+            yend = numpy.array(gamma.get_y(1.0), dtype=numpy.complex)
             phi = matching_permutation(y0, yend)
 
             # add the point to the monodromy group if the permutation is
@@ -362,7 +363,7 @@ class RiemannSurfacePathFactory(object):
         # compute the monodromy element of the point at infinity
         xpath = self.XPF.xpath_around_infinity()
         gamma = self.RiemannSurfacePath_from_xpath(xpath, x0, y0)
-        yend = gamma.get_y(1.0)
+        yend = numpy.array(gamma.get_y(1.0), dtype=numpy.complex)
         phi_oo = matching_permutation(y0, yend)
         if not phi_oo.is_identity():
             # sanity check: the product of the finite branch point

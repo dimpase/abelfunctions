@@ -29,9 +29,9 @@ print b
 # omega = X.holomorphic_differentials()
 # print omega
 
-# print '\nPeriod Matirx:'
-# Omega = X.riemann_matrix()
-# print Omega
+print '\nPeriod Matirx:'
+Omega = X.riemann_matrix()
+print Omega
 
 # print '\nLocalizing a differential:'
 # places = X('oo')

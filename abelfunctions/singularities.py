@@ -53,19 +53,19 @@ def singular_points_finite(f):
     R = f.parent()
     x,y = R.gens()
     n  = f.degree(y)
-    res = f.resultant(f.derivative(y),y).univariate_polynomial()
-    xroots = res.roots(QQbar)
+    res = R(f.resultant(f.derivative(y),y)).univariate_polynomial()
+    xroots = res.roots(ring=QQbar, multiplicities=True)
     for xk,deg in xroots:
         if deg > 1:
             # compute the y-roots above x=xk
-            fxk = f(x=xk).univariate_polynomial()
-            yroots = fxk.roots(QQbar)
+            fxk = f(xk,y).univariate_polynomial()
+            yroots = fxk.roots(ring=QQbar, multiplicities=True)
 
             # for each y-root ykj above xk, record a singular point if the
             # gradient vanishes at (xk,ykj)
             for ykj,_ in yroots:
-                dfdx = f.derivative(x)(x=xk,y=ykj)
-                dfdy = f.derivative(y)(x=xk,y=ykj)
+                dfdx = f.derivative(x)(xk,ykj)
+                dfdy = f.derivative(y)(xk,ykj)
                 if (dfdx == 0) and (dfdy == 0):
                     S.append((xk,ykj,1))
     return S
@@ -99,10 +99,10 @@ def singular_points_infinite(f):
     # find the possible singular points at infinity. these consist of the roots
     # of F(1,y,0) = 0 and F(x,1,0) = 0
     F0 = F(x,y,0)
-    F0x1 = R(F0(1,y,0)).polynomial(y)
-    F0y1 = R(F0(x,1,0)).polynomial(x)
-    solsx1 = F0x1.roots(QQbar)
-    solsy1 = F0y1.roots(QQbar)
+    F0x1 = R(F0(1,y,0)).univariate_polynomial()
+    F0y1 = R(F0(x,1,0)).univariate_polynomial()
+    solsx1 = F0x1.roots(ring=QQbar, multiplicities=True)
+    solsy1 = F0y1.roots(ring=QQbar, multiplicities=True)
     all_points = [(1,yi,0) for yi,_ in solsx1]
     all_points.extend([(xi,1,0) for xi,_ in solsy1])
 
