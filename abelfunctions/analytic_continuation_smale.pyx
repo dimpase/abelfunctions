@@ -35,6 +35,7 @@ cimport cython
 import numpy
 cimport numpy
 import scipy
+import scipy.integrate
 
 from abelfunctions.analytic_continuation cimport AnalyticContinuator
 from abelfunctions.differentials cimport Differential
@@ -240,7 +241,7 @@ cdef class AnalyticContinuatorSmale(AnalyticContinuator):
         f = RS.f
         x,y = f.parent().gens()
         self.df = numpy.array(
-            [MultivariatePolynomial(RS.f.derivative(y,k))
+            [MultivariatePolynomial(f.derivative(y,k))
             for k in range(deg+1)],
             dtype=MultivariatePolynomial)
         AnalyticContinuator.__init__(self, RS, gamma)
@@ -284,6 +285,7 @@ cdef class AnalyticContinuatorSmale(AnalyticContinuator):
         for j in range(self.deg):
             yij = yi[j]
             if smale_alpha(self.df, xip1, yij) > ABELFUNCTIONS_SMALE_ALPHA0:
+#                print '      REFINE (approx. solns)'
                 xiphalf = (xi + xip1)/2.0
                 yiphalf = self.analytically_continue(xi, yi, xiphalf)
                 yip1 = self.analytically_continue(xiphalf, yiphalf, xip1)
@@ -298,12 +300,15 @@ cdef class AnalyticContinuatorSmale(AnalyticContinuator):
                 yik = yi[k]
                 betaik = smale_beta(self.df, xip1, yik)
 
-                if cabs(yij-yik) < 3*(betaij + betaik):
+                if cabs(yij-yik) < 2*(betaij + betaik):
                     # approximate solutions don't lead to distinct
                     # roots. refine the step by analytically continuing
                     # to an intermedite time
+#                    print '      REFINE (not distinct):', xi
+#                    print '                            ', numpy.array(yi, dtype=complex)
                     xiphalf = (xi + xip1)/2.0
                     yiphalf = self.analytically_continue(xi, yi, xiphalf)
+#                    print '                            ', numpy.array(yiphalf, dtype=complex)
                     yip1 = self.analytically_continue(xiphalf, yiphalf, xip1)
                     return yip1
 

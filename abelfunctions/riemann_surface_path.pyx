@@ -37,13 +37,14 @@ Contents
 cimport cython
 import numpy
 cimport numpy
-import sympy
 import matplotlib
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
 from .analytic_continuation cimport AnalyticContinuatorPuiseux
 from .analytic_continuation_smale cimport AnalyticContinuatorSmale
+
+from sage.all import infinity
 
 cdef extern from 'math.h':
     int floor(double)
@@ -118,7 +119,7 @@ cdef class RiemannSurfacePathPrimitive:
             return self._AC
 
     def __init__(self, RiemannSurface RS, complex x0, complex[:] y0,
-                 int ncheckpoints=8):
+                 int ncheckpoints=16):
         r"""Intitialize the `RiemannSurfacePathPrimitive` using a
         `RiemannSurface`, `AnalyticContinuator`, and starting place.
 
@@ -309,7 +310,7 @@ cdef class RiemannSurfacePathPrimitive:
 
         n = self._ncheckpoints
 #        tend = 1. - 1./(n+1)
-        tend = 1
+        tend = 1.0 - 1e-12
         t = numpy.linspace(0, tend, n)
         x = numpy.array([self.get_x(ti) for ti in t], dtype=complex)
         y = numpy.zeros((n, self._RS.deg), dtype=complex)
@@ -603,7 +604,7 @@ cdef class RiemannSurfacePathLine(RiemannSurfacePathPrimitive):
 
     """
     def __init__(self, RiemannSurface RS, complex x0, complex[:] y0,
-                 complex z0, complex z1, int ncheckpoints=8):
+                 complex z0, complex z1, int ncheckpoints=16):
         self.z0 = z0
         self.z1 = z1
         RiemannSurfacePathPrimitive.__init__(
@@ -640,7 +641,7 @@ cdef class RiemannSurfacePathArc(RiemannSurfacePathPrimitive):
     """
     def __init__(self, RiemannSurface RS, complex x0, complex[:] y0,
                  complex R, complex w, complex theta, complex dtheta,
-                 int ncheckpoints=8):
+                 int ncheckpoints=16):
         self.R = R
         self.w = w
         self.theta = theta
@@ -681,7 +682,7 @@ cdef class RiemannSurfacePathRay(RiemannSurfacePathPrimitive):
         return 'Ray(%s)'%(self.x0)
 
     def set_analytic_continuator(self):
-        self._AC = AnalyticContinuatorPuiseux(self._RS, self, sympy.oo)
+        self._AC = AnalyticContinuatorPuiseux(self._RS, self, infinity)
 
     cpdef complex get_x(self, double t):
         if t == 1.0: t -= 1e-12

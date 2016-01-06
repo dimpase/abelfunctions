@@ -98,9 +98,9 @@ def singular_points_infinite(f):
 
     # find the possible singular points at infinity. these consist of the roots
     # of F(1,y,0) = 0 and F(x,1,0) = 0
-    F0 = F(z=0)
-    F0x1 = F0(x=1).univariate_polynomial()
-    F0y1 = F0(y=1).univariate_polynomial()
+    F0 = F(x,y,0)
+    F0x1 = R(F0(1,y,0)).polynomial(y)
+    F0y1 = R(F0(x,1,0)).polynomial(x)
     solsx1 = F0x1.roots(QQbar)
     solsy1 = F0y1.roots(QQbar)
     all_points = [(1,yi,0) for yi,_ in solsx1]
@@ -118,7 +118,7 @@ def singular_points_infinite(f):
     # finally, check the gradient condition to get the actual singular points
     grad = F.gradient()
     for xi,yi,zi in normalized_points:
-        grad_vals = [dFi(x=xi,y=yi,z=zi) for dFi in grad]
+        grad_vals = [dFi(xi,yi,zi) for dFi in grad]
         is_zero = all(map(lambda arg: arg.is_zero(), grad_vals))
         if is_zero:
             S.append((xi,yi,zi))

@@ -47,7 +47,7 @@ from abelfunctions.singularities import singularities, _transform, genus
 from abelfunctions.polynomials cimport MultivariatePolynomial
 from abelfunctions.riemann_surface_path cimport RiemannSurfacePathPrimitive
 
-from sage.all import solve, infinity
+from sage.all import solve, infinity, CC
 from sage.rings.polynomial.all import PolynomialRing
 from sage.rings.rational_field import QQ
 from sage.rings.qqbar import QQbar
@@ -214,7 +214,7 @@ def differentials_numerators(f):
     numerators = Pc.coefficients()
     return numerators
 
-def differentials(f):
+def differentials(RS):
     r"""Returns a basis for the space of Abelian differentials of the first kind on
     the Riemann surface obtained from the curve `f`.
 
@@ -228,13 +228,13 @@ def differentials(f):
     diffs : list
         A holomorphic differentials basis.
     """
-    f = f.change_ring(QQbar)
+    f = RS.f.change_ring(QQbar)
     R = f.parent()
     x,y = R.gens()
 
     dfdy = f.derivative(y)
     numers = differentials_numerators(f)
-    diffs = [AbelianDifferentialFirstKind(numer, dfdy) for numer in numers]
+    diffs = [AbelianDifferentialFirstKind(RS, numer, dfdy) for numer in numers]
     return diffs
 
 
@@ -278,31 +278,35 @@ cdef class Differential:
 
         """
         if (len(args) < 1) or (len(args) > 2):
-            raise ValueError('Instantiate Differential with Sympy expression '
-                             'or numerator/denominator pair.')
+            raise ValueError('Instantiate Differential with a rational '
+                             'expression or numerator/denominator pair.')
 
         # determine the numerator and denominator of the differentials
-        if len(args) == 1:
-            self.numer = args[0].numerator()
-            self.denom = args[0].denominator()
-        elif len(args) == 2:
-            self.numer = args[0]
-            self.denom = args[1]
-
         self.RS = RS
-        self.numer_n = MultivariatePolynomial(self.numer)
-        self.denom_n = MultivariatePolynomial(self.denom)
+        R = RS.f.parent()
+        RCC = RS.f.change_ring(CC).parent()
+        if len(args) == 1:
+            self.numer = R(args[0].numerator())
+            self.denom = R(args[0].denominator())
+        elif len(args) == 2:
+            self.numer = R(args[0])
+            self.denom = R(args[1])
+
+        self.numer_n = MultivariatePolynomial(RCC(self.numer))
+        self.denom_n = MultivariatePolynomial(RCC(self.denom))
 
     def __repr__(self):
         s = ''
-        if self.numer.is_Add:
+        is_add = True if len(self.numer.dict()) > 1 else False
+        if is_add:
             s += '(' + str(self.numer) + ')'
         else:
             s += str(self.numer)
 
         s += '/'
 
-        if self.denom.is_Add:
+        is_add = True if len(self.denom.dict()) > 1 else False
+        if is_add:
             s += '(' + str(self.denom) + ')'
         else:
             s += str(self.denom)
@@ -613,55 +617,55 @@ cdef class AbelianDifferentialFirstKind(Differential):
         return D
 
 
-# cdef class AbelianDifferentialSecondKind(Differential):
-#     r"""Defines an Abelian Differential of the second kind.
+cdef class AbelianDifferentialSecondKind(Differential):
+    r"""Defines an Abelian Differential of the second kind.
 
-#     An Abelian differential of the second kind is one constructed in the
-#     following way: given a place :math:`P \in X` and a positive integer
-#     :math:`m` an Abelian differential of second kind is a meromorphic
-#     differential with a pole only at :math:`P` of order :math:`m+1`.
-#     """
-#     def valuation_divisor(self, **kwds):
-#         r"""Returns the valuation divisor of the Abelian differential of the second
-#         kind.
+    An Abelian differential of the second kind is one constructed in the
+    following way: given a place :math:`P \in X` and a positive integer
+    :math:`m` an Abelian differential of second kind is a meromorphic
+    differential with a pole only at :math:`P` of order :math:`m+1`.
+    """
+    def valuation_divisor(self, **kwds):
+        r"""Returns the valuation divisor of the Abelian differential of the second
+        kind.
 
-#         Parameters
-#         ----------
-#         none
+        Parameters
+        ----------
+        none
 
-#         Returns
-#         -------
-#         Divisor
+        Returns
+        -------
+        Divisor
 
-#         """
-#         xvalues = self._find_necessary_xvalues()
+        """
+        xvalues = self._find_necessary_xvalues()
 
-#         # for each xvalue, compute the places above it and determine valuation
-#         # of the differential over each of these places.
-#         D = Divisor(self.RS,0)
-#         genus = self.RS.genus()
-#         target_genus = 2*genus - 2
-#         num_poles = 0
-#         for alpha in xvalues:
-#             places_above_alpha = self.RS(alpha)
-#             for P in places_above_alpha:
-#                 n = P.valuation(self)
-#                 D += n*P
+        # for each xvalue, compute the places above it and determine valuation
+        # of the differential over each of these places.
+        D = Divisor(self.RS,0)
+        genus = self.RS.genus()
+        target_genus = 2*genus - 2
+        num_poles = 0
+        for alpha in xvalues:
+            places_above_alpha = self.RS(alpha)
+            for P in places_above_alpha:
+                n = P.valuation(self)
+                D += n*P
 
-#                 # differentials of the second kind should have a single
-#                 # pole. raise an error if more are found
-#                 if n < 0: num_poles += 1
-#                 if num_poles > 1:
-#                     raise ValueError(
-#                         'Could not compute valuation divisor of %s: '
-#                         'found more than one pole.'%self)
+                # differentials of the second kind should have a single
+                # pole. raise an error if more are found
+                if n < 0: num_poles += 1
+                if num_poles > 1:
+                    raise ValueError(
+                        'Could not compute valuation divisor of %s: '
+                        'found more than one pole.'%self)
 
-#                 # break out if (a) the degree requirement is met and (b) the
-#                 # pole was found.
-#                 if (D.degree == target_genus) and (num_poles):
-#                     return D
+                # break out if (a) the degree requirement is met and (b) the
+                # pole was found.
+                if (D.degree == target_genus) and (num_poles):
+                    return D
 
-#         if D.degree != target_genus:
-#             raise ValueError('Could not compute valuation divisor of %s: '
-#                              'did not reach genus requirement.'%self)
-#         return D
+        if D.degree != target_genus:
+            raise ValueError('Could not compute valuation divisor of %s: '
+                             'did not reach genus requirement.'%self)
+        return D

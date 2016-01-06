@@ -14,6 +14,8 @@ import numpy
 cimport numpy
 cimport cython
 
+from sage.all import CC
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef class UnivariatePolynomial:
@@ -40,7 +42,7 @@ cdef class UnivariatePolynomial:
     eval(complex z)
         Evaluate the polynomial at the complex point `z`.
     """
-    def __cinit__(self,f):
+    def __cinit__(self, f):
         """Initialize a UnivariatePolynomial from a SymPy Poly.
 
         Parameters
@@ -48,7 +50,8 @@ cdef class UnivariatePolynomial:
         f : univariate polynomail
         """
         cdef int n
-        coeffs = numpy.array(f.coefficients(sparse=True),dtype=complex)
+        f = f.change_ring(CC)
+        coeffs = numpy.array(f.coefficients(sparse=False), dtype=complex)[::-1]
         self.deg = len(coeffs) - 1
         self.c = coeffs
 
@@ -124,7 +127,7 @@ cdef class MultivariatePolynomial:
     eval(complex z)
         Evaluate the polynomial at the complex point `z`.
     """
-    def __cinit__(self,f):
+    def __cinit__(self, f):
         """Initialize a MultivariatePolynomial from a SymPy Poly.
 
         Parameters
@@ -137,13 +140,14 @@ cdef class MultivariatePolynomial:
             coefficients are polynomials in `x`.
         """
         cdef int n
+        f = f.change_ring(CC)
         R = f.parent()
         x,y = R.gens()
         f = f.polynomial(y)
-        coeffs = f.coefficients(sparse=True)
+        coeffs = f.coefficients(sparse=False)[::-1]
         self.deg = len(coeffs) - 1
         self.c = numpy.array(
-            [UnivariatePolynomial(coeff,x) for coeff in coeffs],
+            [UnivariatePolynomial(coeff) for coeff in coeffs],
             dtype=UnivariatePolynomial)
 
     def __repr__(self):

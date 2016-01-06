@@ -32,8 +32,6 @@ cdef class RiemannSurface:
     ----------
     f : sympy.Expression
         The algebraic curve representing the Riemann surface.
-    x,y : sympy.Symbol
-        The dependent and independent variables, respectively.
     """
     property f:
         def __get__(self):
@@ -74,7 +72,7 @@ cdef class RiemannSurface:
         self._discriminant_points_exact = None
         self.discriminant_points()  # sets the base point of the surface
 
-        # se the base sheets
+        # set the base sheets
         if base_sheets:
             self._base_sheets = base_sheets
         else:
@@ -87,10 +85,9 @@ cdef class RiemannSurface:
         self._genus = None
         self._holomorphic_differentials = None
         self.PathFactory = RiemannSurfacePathFactory(self)
-
+        
     def __repr__(self):
-        s = 'Riemann surface defined by f(%s,%s) = %s'%(
-            self._x, self._y, self._f)
+        s = 'Riemann surface defined by f = %s'%(self.f)
         return s
 
     def __call__(self, alpha, beta=None):
@@ -147,8 +144,8 @@ cdef class RiemannSurface:
         # lying above x=alpha
         R = self.f.parent()
         x,y = R.gens()
-        falpha = self.f(alpha,y)
-        yroots = falpha.roots(ring=QQbar, multiplicities=False)
+        falpha = self.f(alpha,y).univariate_polynomial()
+        yroots = falpha.roots(ring=falpha.base_ring(), multiplicities=False)
         return [RegularPlace(self, alpha, beta) for beta in yroots]
 
     def show_paths(self, ax=None, *args, **kwds):
@@ -204,8 +201,7 @@ cdef class RiemannSurface:
         # compute the symbolic and numerical discriminant points
         f = self.f
         x,y = f.parent().gens()
-        p = f
-        res = p.resultant(p.deriviative(y),y)
+        res = f.resultant(f.derivative(y),y).univariate_polynomial()
         rts = res.roots(ring=QQbar, multiplicities=False)
         discriminant_points_exact = numpy.array(rts)
         discriminant_points = discriminant_points_exact.astype(numpy.complex)
@@ -327,7 +323,7 @@ cdef class RiemannSurface:
         self._base_sheets = self.lift(self._base_point)
         return self._base_sheets
 
-    def lift(self, x):
+    def lift(self, x0):
         r"""List the x-point `x` to the fibre of y-roots.
 
         Basically, computes the y-roots of :math:`f(x,y) = 0` for the
@@ -348,12 +344,10 @@ cdef class RiemannSurface:
         list, complex
         """
         # compute the base sheets
-        p = self._f.as_poly(self._y)
-        coeffs = numpy.array(
-            [c.evalf(subs={self._x:x}, n=15) for c in p.all_coeffs()],
-            dtype=numpy.complex)
-        poly = numpy.poly1d(coeffs)
-        lift = poly.r
+        R = self.f.parent()
+        x,y = R.gens()
+        p = self.f(x0,y).univariate_polynomial()
+        lift = p.roots(ring=p.base_ring(), multiplicities=False)
         return lift
 
     def base_lift(self):
@@ -376,7 +370,7 @@ cdef class RiemannSurface:
 
         """
         if not self._holomorphic_differentials:
-            self._holomorphic_differentials = differentials(self.f)
+            self._holomorphic_differentials = differentials(self)
         return self._holomorphic_differentials
 
     def holomorphic_oneforms(self):
@@ -451,16 +445,21 @@ cdef class RiemannSurface:
         if not (self._period_matrix is None):
             return self._period_matrix
 
+        print 'Computing c_cycles:'
         c_cycles, linear_combinations = self.c_cycles()
         oneforms = self.holomorphic_oneforms()
         c_periods = []
         g = self.genus()
         m = len(c_cycles)
+        print c_cycles
+        print
 
         for omega in oneforms:
             omega_periods = []
             for gamma in c_cycles:
+                print 'Computing c-period:'
                 omega_periods.append(self.integrate(omega, gamma))
+                print omega_periods
             c_periods.append(omega_periods)
 
         # take appropriate linear combinations of the c-periods to

@@ -350,7 +350,7 @@ class RiemannSurfacePathFactory(object):
             gamma = self.RiemannSurfacePath_from_xpath(xpath, x0, y0)
 
             # compute the end fibre and the corresponding permutation
-            yend = gamma.get_y(1.0)
+            yend = numpy.array(gamma.get_y(1.0))
             phi = matching_permutation(y0, yend)
 
             # add the point to the monodromy group if the permutation is
@@ -516,8 +516,8 @@ class RiemannSurfacePathFactory(object):
                                                 y0_segment, *data)
 
             # determine the starting place of the next segment
-            x0_segment = segment.get_x(1.0)
-            y0_segment = segment.get_y(1.0)
+            x0_segment = segment.get_x(numpy.double(1.0))
+            y0_segment = segment.get_y(numpy.double(1.0))
             segments.append(segment)
 
         # build the entire path from the path segments

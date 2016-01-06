@@ -15,6 +15,6 @@ cdef class Differential:
 cdef class AbelianDifferentialFirstKind(Differential):
     pass
 
-# cdef class AbelianDifferentialSecondKind(Differential):
-#     pass
+cdef class AbelianDifferentialSecondKind(Differential):
+    pass
 
