@@ -10,7 +10,6 @@ import numpy
 import scipy
 import sympy
 import networkx as nx
-import matplotlib.pyplot as plt
 
 from sage.all import infinity, QQbar
 

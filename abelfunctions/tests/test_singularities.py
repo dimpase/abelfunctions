@@ -44,8 +44,8 @@ class TestSingularPointsFinite(AbelfunctionsTestCase):
         s_actual = [(0,0,1)]
         self.assertEqual(s,s_actual)
 
-    def test_f5(self):
-        pass
+    # def test_f5(self):
+    #     pass
 
     def test_f6(self):
         s = singular_points_finite(self.f6)
@@ -103,8 +103,8 @@ class TestSingularPointsInfinite(AbelfunctionsTestCase):
         s_actual = []
         self.assertEqual(s,s_actual)
 
-    def test_f5(self):
-        pass
+    # def test_f5(self):
+    #     pass
 
     def test_f6(self):
         s = singular_points_infinite(self.f6)
@@ -290,3 +290,10 @@ class TestGenus(AbelfunctionsTestCase):
     def test_f10(self):
         g = genus(self.f10)
         self.assertEqual(g, 3)
+
+    def test_issue71(self):
+        R = QQ['x,y']
+        x,y = R.gens()
+        f = -x**5 + x + y**3
+        g = genus(f)
+        self.assertEqual(g, 4)

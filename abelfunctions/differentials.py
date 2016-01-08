@@ -44,19 +44,15 @@ from abelfunctions.divisor import Divisor, Place
 from abelfunctions.integralbasis import integral_basis
 from abelfunctions.puiseux import puiseux
 from abelfunctions.singularities import singularities, _transform, genus
-from abelfunctions.polynomials cimport MultivariatePolynomial
-from abelfunctions.riemann_surface_path cimport RiemannSurfacePathPrimitive
 
-from sage.all import solve, infinity, CC
+from sage.all import solve, infinity, CC, fast_callable
 from sage.rings.polynomial.all import PolynomialRing
 from sage.rings.rational_field import QQ
 from sage.rings.qqbar import QQbar
 
-cimport cython
 import numpy
-cimport numpy
-import matplotlib
-import matplotlib.pyplot as plt
+# import matplotlib
+# import matplotlib.pyplot as plt
 
 def mnuk_conditions(g, b, generic_adjoint):
     """Determine the Mnuk conditions on the coefficients of :math:`P`.
@@ -238,7 +234,7 @@ def differentials(RS):
     return diffs
 
 
-cdef class Differential:
+class Differential:
     """A differential one-form which can be defined on a Riemann surface.
 
     Attributes
@@ -261,71 +257,40 @@ cdef class Differential:
     of differentials.
 
     """
-    def __cinit__(self, RS, *args):
+    def __init__(self, RS, *args):
         """Create a differential on the Riemann surface `RS`.
-
-        Parameters
-        ----------
-        RS : RiemannSurface
-            The Riemann surface on which the differential is defined.
-        *args : list
-
-            A differential can be instantiated by a single rational expression
-            or by a two polynomials, representing the numerator and denominator
-            of the differential. The latter distinction makes analysis of
-            Abelian differentials of the first kind more computationally
-            efficient.
-
         """
         if (len(args) < 1) or (len(args) > 2):
-            raise ValueError('Instantiate Differential with a rational '
-                             'expression or numerator/denominator pair.')
+            raise ValueError('Instantiate Differential with Sympy expression '
+                             'or numerator/denominator pair.')
 
         # determine the numerator and denominator of the differentials
-        self.RS = RS
-        R = RS.f.parent()
-        RCC = RS.f.change_ring(CC).parent()
         if len(args) == 1:
-            self.numer = R(args[0].numerator())
-            self.denom = R(args[0].denominator())
+            self.numer = args[0].numerator()
+            self.denom = args[0].denominator()
         elif len(args) == 2:
-            self.numer = R(args[0])
-            self.denom = R(args[1])
+            self.numer = args[0]
+            self.denom = args[1]
 
-        self.numer_n = MultivariatePolynomial(RCC(self.numer))
-        self.denom_n = MultivariatePolynomial(RCC(self.denom))
+        x,y = RS.f.parent().gens()
+        self.RS = RS
+        self.differential = self.numer / self.denom
+        self.numer_n = fast_callable(self.numer.change_ring(CC), vars=[x,y],
+                                     domain=numpy.complex)
+        self.denom_n = fast_callable(self.denom.change_ring(CC), vars=[x,y],
+                                     domain=numpy.complex)
 
     def __repr__(self):
-        s = ''
-        is_add = True if len(self.numer.dict()) > 1 else False
-        if is_add:
-            s += '(' + str(self.numer) + ')'
-        else:
-            s += str(self.numer)
+        print self.differential
 
-        s += '/'
+    def __call__(self, *args, **kwds):
+        return self.eval(*args, **kwds)
 
-        is_add = True if len(self.denom.dict()) > 1 else False
-        if is_add:
-            s += '(' + str(self.denom) + ')'
-        else:
-            s += str(self.denom)
-        return s
-
-    cpdef complex eval(self, complex x, complex y):
+    def eval(self, *args, **kwds):
         r"""Evaluate the differential at the complex point :math:`(x,y)`.
-
-        Parameters
-        ----------
-        x,y : complex
-
-        Returns
-        -------
-        complex
-            Returns the value :math:`\omega(x,y)`.
-
         """
-        return self.numer_n.eval(x,y) / self.denom_n.eval(x,y)
+        val = self.numer_n(*args, **kwds) / self.denom_n(*args, **kwds)
+        return numpy.complex(val)
 
     def centered_at_place(self, P, order=None):
         r"""Rewrite the differential in terms of the local coordinates at `P`.
@@ -348,15 +313,12 @@ cdef class Differential:
         -------
         sympy.Expr
         """
-        x = self.x
-        y = self.y
-
         # by default, non-discriminant places do not store Pusieux series
         # expansions. this might change in the future
         if P.is_discriminant():
             p = P.puiseux_series
         else:
-            p = puiseux(self.RS.f,P.x,P.y)[0]
+            p = puiseux(self.RS.f)[0]
 
         # substitute Puiseux series expansion into the differrential and expand
         # as a Laurent series
@@ -370,10 +332,7 @@ cdef class Differential:
         r"""Same as :meth:`centered_at_place`."""
         return self.centered_at_place(*args, **kwds)
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cpdef complex[:] evaluate(self, RiemannSurfacePathPrimitive gamma,
-                              double[:] t):
+    def evaluate(self, gamma, t):
         r"""Evaluates `omega` along the path at `N` uniform points.
 
         .. note::
@@ -393,7 +352,7 @@ cdef class Differential:
         complex[:]
             The differential omega evaluated along the path at `N` points.
         """
-        return gamma.evaluate(self,t)
+        return gamma.evaluate(self, t)
 
     def _find_necessary_xvalues(self):
         r"""Returns a list of x-points over which the places appearing in the
@@ -426,7 +385,7 @@ cdef class Differential:
 
         # get possible x-values from the denominator. in the case when the
         # denominator is dfdy these are simply the discriminant points
-        denom = self.denom
+        denom = self.differential.denominator()
         if denom == f.derivative(y):
             denom_roots = self.RS.discriminant_points()
         else:
@@ -494,8 +453,7 @@ cdef class Differential:
                 'did not reach genus requirement.'%self)
         return D
 
-    def plot(self, RiemannSurfacePathPrimitive gamma, N=256, grid=False,
-             **kwds):
+    def plot(self, gamma, N=256, grid=False, **kwds):
         r"""Plot the differential along the RiemannSurfacePath `gamma`.
 
         Parameters
@@ -555,10 +513,10 @@ cdef class Differential:
         -------
         sympy.Expr
         """
-        return self.numer / self.denom
+        return self.differential
 
 
-cdef class AbelianDifferentialFirstKind(Differential):
+class AbelianDifferentialFirstKind(Differential):
     def valuation_divisor(self, proof=False, **kwds):
         r"""Returns the valuation divisor of the Abelian differential of the first kind.
 
@@ -617,7 +575,7 @@ cdef class AbelianDifferentialFirstKind(Differential):
         return D
 
 
-cdef class AbelianDifferentialSecondKind(Differential):
+class AbelianDifferentialSecondKind(Differential):
     r"""Defines an Abelian Differential of the second kind.
 
     An Abelian differential of the second kind is one constructed in the

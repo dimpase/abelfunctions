@@ -99,7 +99,8 @@ Contents
 --------
 
 """
-from sage.rings.arith import gcd
+#from sage.rings.arith import gcd
+from sage.all import gcd, fast_callable
 from sage.rings.infinity import infinity
 from sage.rings.laurent_series_ring_element import (
     LaurentSeries,
@@ -164,6 +165,7 @@ class PuiseuxSeries(AlgebraElement):
             l = parent.laurent_series_ring()(f)
 
         self.__l = l
+        self.__lp = l.laurent_polynomial() # XXX evaluation hack
         self.__a = a
         self.__e = e
 
@@ -252,7 +254,7 @@ class PuiseuxSeries(AlgebraElement):
     def __call__(self, x):
         r"""Evaluate this Puiseux series."""
         t = (x-self.__a)**(1/self.__e)
-        return self.__l(t)
+        return self.__lp(t)
 
     def _common_ramification_index(self, right):
         r"""Returns a ramification index common to self and right.
@@ -291,12 +293,6 @@ class PuiseuxSeries(AlgebraElement):
         if not self.__a == right.__a:
             raise ValueError('Can only add Puiseux series with same center')
 
-        # # special case when one of the orther is 0
-        # if not right:
-        #     return self.add_bigoh(right.prec())
-        # if not self:
-        #     return right.add_bigoh(self.prec())
-
         # find a common ramification index and transform the two underlying
         # Laurent series
         x = self._parent.laurent_series_ring().gen()
@@ -310,12 +306,6 @@ class PuiseuxSeries(AlgebraElement):
         # can only add puiseux series with the same center
         if not self.__a == right.__a:
             raise ValueError('Can only add Puiseux series with same center')
-
-        # # special case when one of the orther is 0
-        # if not right:
-        #     return self.add_bigoh(right.prec())
-        # if not self:
-        #     return right.add_bigoh(self.prec())
 
         # find a common ramification index
         x = self._parent.laurent_series_ring().gen()

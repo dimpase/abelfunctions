@@ -34,30 +34,19 @@ Contents
 
 """
 
-cimport cython
 import numpy
-cimport numpy
-import matplotlib
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.pyplot as plt
 
-from .analytic_continuation cimport AnalyticContinuatorPuiseux
-from .analytic_continuation_smale cimport AnalyticContinuatorSmale
+import abelfunctions
+from abelfunctions.analytic_continuation import AnalyticContinuatorPuiseux
+from abelfunctions.analytic_continuation_smale import AnalyticContinuatorSmale
 
 from sage.all import infinity
 
-cdef extern from 'math.h':
-    int floor(double)
-cdef extern from 'complex.h':
-    complex cexp(complex)
-    double cabs(complex)
-
-cdef class RiemannSurfacePathPrimitive:
+class RiemannSurfacePathPrimitive(object):
     r"""Primitive Riemann surface path object.
 
-    Defines basic, primitive functionality for Riemann surface
-    paths. Each path primitive is parameterized from :math:`t=0` to
-    :math:`t=1`.
+    Defines basic, primitive functionality for Riemann surface paths. Each path
+    primitive is parameterized from :math:`t=0` to :math:`t=1`.
 
     Attributes
     ----------
@@ -86,40 +75,34 @@ cdef class RiemannSurfacePathPrimitive:
     plot3d_y
 
     """
-    property segments:
-        r"""The individual :py:class:`RiemannSurfacePathPrimitive` objects that
-        make up this object.
+    @property
+    def segments(self):
+        r"""The individual :py:class:`RiemannSurfacePathPrimitive` objects that make up
+        this object.
 
-        Every `RiemannSurfacePathPrimitive` object contains a list of
-        "path segments". In the case when this list of length one the
-        list contains only the object itself.
+        Every `RiemannSurfacePathPrimitive` object contains a list of "path
+        segments". In the case when this list of length one the list contains
+        only the object itself.
 
-        When the number of path segments is greater than one, the object
-        should be coerced to a :py:class:`RiemannSurfacePath`
-        object. Each element is a primitive representing an arc or
-        straight line path in the complex x-plane.
-        """
-        def __get__(self):
-            return self._segments
+        When the number of path segments is greater than one, the object should
+        be coerced to a :py:class:`RiemannSurfacePath` object. Each element is
+        a primitive representing an arc or straight line path in the complex
+        x-plane. """
+        return self._segments
+    @property
+    def RS(self):
+        return self._RS
+    @property
+    def x0(self):
+        return self._x0
+    @property
+    def y0(self):
+        return self._y0
+    @property
+    def AC(self):
+        return self._AC
 
-    property RS:
-        def __get__(self):
-            return self._RS
-
-    property x0:
-        def __get__(self):
-            return self._x0
-
-    property y0:
-        def __get__(self):
-            return numpy.array(self._y0, dtype=complex)
-
-    property AC:
-        def __get__(self):
-            return self._AC
-
-    def __init__(self, RiemannSurface RS, complex x0, complex[:] y0,
-                 int ncheckpoints=16):
+    def __init__(self, RS, x0, y0, ncheckpoints=16):
         r"""Intitialize the `RiemannSurfacePathPrimitive` using a
         `RiemannSurface`, `AnalyticContinuator`, and starting place.
 
@@ -129,14 +112,14 @@ cdef class RiemannSurfacePathPrimitive:
         self._AC = None
         self._x0 = numpy.complex(x0)
         self._y0 = numpy.array(y0, dtype=complex)
-        self._segments = numpy.array([self], dtype=RiemannSurfacePathPrimitive)
+        self._segments = [self]
         self._nsegments = 1
         self._ncheckpoints = ncheckpoints
 
         self._tcheckpoints = numpy.zeros(ncheckpoints, dtype=numpy.double)
-        self._xcheckpoints = numpy.zeros(ncheckpoints, dtype=complex)
-        self._ycheckpoints = numpy.zeros((ncheckpoints,RS.deg), dtype=complex)        
-        
+        self._xcheckpoints = numpy.zeros(ncheckpoints, dtype=numpy.complex)
+        self._ycheckpoints = numpy.zeros((ncheckpoints,RS.deg), dtype=complex)
+
         if self._ncheckpoints > 0:
             self.set_analytic_continuator()
             self._initialize_checkpoints()
@@ -149,13 +132,13 @@ cdef class RiemannSurfacePathPrimitive:
 
     def _set_str(self):
         is_cycle = False
-        startx = numpy.complex(self._x0)
-        endx = numpy.complex(self.get_x(1.0))
+        startx = self._x0
+        endx = self.get_x(1.0)
 
         # cheap check: if the x-endpoints match
         if numpy.abs(startx - endx) < 1e-12:
-            starty = numpy.array(self._y0, dtype=complex)
-            endy = numpy.array(self.get_y(1.0), dtype=complex)
+            starty = self._y0
+            endy = self.get_y(1.0)
 
             # expensive check: if the y-endpoints match
             if numpy.linalg.norm(starty - endy) < 1e-12:
@@ -169,14 +152,14 @@ cdef class RiemannSurfacePathPrimitive:
     def _set_str_noncycle(self):
         r"""Generates the string representation of self in the case when self is
         not a cycle."""
-        xstart = numpy.complex(self._x0)
-        ystart = numpy.complex(self._y0[0])
+        xstart = self._x0
+        ystart = self._y0[0]
         P = str((xstart, ystart))
 
         last_segment_AC = self.segments[-1].AC
         if isinstance(last_segment_AC, AnalyticContinuatorSmale):
-            xend = numpy.complex(self.get_x(1.0))
-            yend = numpy.complex(self.get_y(1.0)[0])
+            xend = self.get_x(1.0)
+            yend = self.get_y(1.0)[0]
             Q = str((xend,yend))
         else:
             Q = str(last_segment_AC.target_place)
@@ -185,10 +168,10 @@ cdef class RiemannSurfacePathPrimitive:
     def set_analytic_continuator(self):
         r"""Select and appropriate analytic continuator for this path.
 
-        If either the starting or ending place is at a discriminant
-        point of the underlying curve then use an analytic continuation
-        method that can distinguish between places lying above
-        discriminant points. Otherwise, use a fast numerical method.
+        If either the starting or ending place is at a discriminant point of
+        the underlying curve then use an analytic continuation method that can
+        distinguish between places lying above discriminant points. Otherwise,
+        use a fast numerical method.
 
         Parameters
         ----------
@@ -197,35 +180,34 @@ cdef class RiemannSurfacePathPrimitive:
         Returns
         -------
         AnalyticContinuator
-            An :class:`AnalyticContinuator` which defines how to
-            analytically continue y-roots along a path.
+            An :class:`AnalyticContinuator` which defines how to analytically
+            continue y-roots along a path.
 
         Notes
         -----
-        Currently, this method will only look at the endpoint of the
-        path to determine if it is epsilon close to a discriminant point
-        of the curve. (Meaning that the places lying above the point can
-        only be distinguished by Puiseux series.) A future update should
-        determine if the path crosses through or passes near enough to
-        the discriminant point.
+        Currently, this method will only look at the endpoint of the path to
+        determine if it is epsilon close to a discriminant point of the curve.
+        (Meaning that the places lying above the point can only be
+        distinguished by Puiseux series.) A future update should determine if
+        the path crosses through or passes near enough to the discriminant
+        point.
 
         """
         # set the analytic continuator by checking if the end of the
         # path is close to a discriminant point
         x_end = self.get_x(1.0)
-        b = self._RS.closest_discriminant_point(x_end, exact=False)
+        b = self._RS.closest_discriminant_point(x_end, exact=True)
         if numpy.abs(numpy.complex(b) - x_end) < 1e-12:
             self._AC = AnalyticContinuatorPuiseux(self._RS, self, b)
         else:
             self._AC = AnalyticContinuatorSmale(self._RS, self)
 
-    def __add__(self, RiemannSurfacePathPrimitive other):
+    def __add__(self, other):
         r"""Add two Riemann surface paths together.
 
-        Checks if the ending place of `self` is equal to the ending
-        place of `other`. If so, returns a `RiemannSurfacePath` object
-        whose segments are a concatenation of the path segments of each
-        summand.
+        Checks if the ending place of `self` is equal to the ending place of
+        `other`. If so, returns a `RiemannSurfacePath` object whose segments
+        are a concatenation of the path segments of each summand.
 
         Parameters
         ----------
@@ -235,39 +217,38 @@ cdef class RiemannSurfacePathPrimitive:
         -------
         RiemannSurfacePath
         """
-        # try getting the segments of the other object. Doing so asserts
-        # that the other object is of type RiemannSurfacePathPrimitve
-        cdef RiemannSurfacePathPrimitive[:] segments
+        # try getting the segments of the other object. Doing so asserts that
+        # the other object is of type RiemannSurfacePathPrimitve
         try:
-            segments = numpy.append(self.segments, other.segments)
+            segments = self.segments + other.segments
         except AttributeError:
             raise TypeError('Summands must both be of '
                             'RiemannSurfacePathPrimitive type.')
 
-        # assert that the endpoint of the segments of this path matches
-        # with those of the other path
-        cdef double eps = 1e-8
-        cdef int deg = self.RS.deg
-        cdef int k
+        # assert that the endpoint of the segments of this path matches with
+        # those of the other path
+        eps = 1e-8
+        deg = self.RS.deg
 
-        # get the ending place of the left RSPath (self) and the
-        # starting place of the right RSPath (other).
-        cdef RiemannSurfacePathPrimitive end_segment = self.segments[-1]
-        cdef complex x_end = end_segment.get_x(1.0)
-        cdef complex[:] y_end = end_segment.get_y(1.0)
-        cdef complex x_start = other.x0
-        cdef complex[:] y_start = other.y0
+        # get the ending place of the left RSPath (self) and the starting place
+        # of the right RSPath (other).
+        end_segment = self.segments[-1]
+        x_end = end_segment.get_x(1.0)
+        y_end = end_segment.get_y(1.0)
+        x_start = other.x0
+        y_start = other.y0
 
         # if the x- or y-values don't match, raise an error
-        y_error = numpy.linalg.norm(numpy.array(y_start) - numpy.array(y_end))
-        if (cabs(x_start - x_end) > eps) or (y_error > eps):
+        y_error = numpy.linalg.norm(y_start - y_end)
+        if (abs(x_start - x_end) > eps) or (y_error > eps):
             raise ValueError('Cannot form sum of paths: starting place and '
                              'fibre of right Riemann surface path does not '
                              'match ending place of left path.')
-        else:
-            return RiemannSurfacePath(self.RS, self.x0, self.y0, segments)
 
-    cdef int _nearest_checkpoint_index(self, double t):
+        gamma = RiemannSurfacePath(self.RS, self.x0, self.y0, segments)
+        return gamma
+
+    def _nearest_checkpoint_index(self, t):
         r"""Returns the index of the checkpoint closest to and preceding ``t``.
 
         Parameters
@@ -280,13 +261,12 @@ cdef class RiemannSurfacePathPrimitive:
             The index ``k`` such that ``self._tcheckpoints[k] <= t`` but
             ``self._tcheckpoints[k+1] > t``.
         """
-        cdef int n, k
-        cdef double ti
         n = self._ncheckpoints
         for k in range(1,n):
             ti = self._tcheckpoints[k]
             if ti >= t:
                 return k-1
+
         # use first checkpoint if something goes wrong
         return 0
 
@@ -307,23 +287,16 @@ cdef class RiemannSurfacePathPrimitive:
         None
 
         """
-        cdef double[:] t
-        cdef complex[:] x
-        cdef complex[:,:] y
-        cdef int n,k
-        cdef double tim1,ti
-        cdef complex xim1,xi
-        cdef complex[:] yim1,yi
-
+        # initialize containers
         n = self._ncheckpoints
 #        tend = 1. - 1./(n+1)
         tend = 1.0
         t = numpy.linspace(0, tend, n)
-        x = numpy.array([self.get_x(ti) for ti in t], dtype=complex)
-        y = numpy.zeros((n, self._RS.deg), dtype=complex)
+        x = numpy.array([self.get_x(ti) for ti in t], dtype=numpy.complex)
+        y = numpy.zeros((n, self._RS.deg), dtype=numpy.complex)
 
-        # for each t-checkpoint compute the corresponding x- and
-        # y-checkpoint by analytically continuing.
+        # for each t-checkpoint compute the corresponding x- and y-checkpoint
+        # by analytically continuing.
         tim1 = 0.0
         xim1 = self._x0
         yim1 = self._y0
@@ -340,7 +313,7 @@ cdef class RiemannSurfacePathPrimitive:
         self._xcheckpoints = x
         self._ycheckpoints = y
 
-    cpdef complex get_x(self, double t):
+    def get_x(self, t):
         r"""Return the x-part of the path at :math:`t \in [0,1]`.
 
         Parameters
@@ -355,7 +328,7 @@ cdef class RiemannSurfacePathPrimitive:
         raise NotImplementedError('Must override RiemannSurfacePathPrimitive.'
                                   'get_x() method in subclass.')
 
-    cpdef complex get_dxdt(self, double t):
+    def get_dxdt(self, t):
         r"""Return the derivative of the x-part of the path at :math:`t \in
         [0,1]`.
 
@@ -371,8 +344,7 @@ cdef class RiemannSurfacePathPrimitive:
         raise NotImplementedError('Must override RiemannSurfacePathPrimitive.'
                                   'get_dxdt() method in subclass.')
 
-    cpdef complex[:] analytically_continue(self, complex xi, complex[:] yi,
-                                           complex xip1):
+    def analytically_continue(self, xi, yi, xip1):
         r"""Analytically continue the fibre ``yi`` from ``xi`` to ``xip1``.
 
         .. note::
@@ -393,12 +365,10 @@ cdef class RiemannSurfacePathPrimitive:
             The fibre above ``xip1``.
 
         """
-        cdef complex[:] yip1 = self._AC.analytically_continue(xi, yi, xip1)
+        yip1 = self._AC.analytically_continue(xi, yi, xip1)
         return yip1
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cpdef complex[:] get_y(self, double t):
+    def get_y(self, t):
         r"""Return the y-fibre of the path at :math:`t \in [0,1]`.
 
         Parameters
@@ -410,11 +380,6 @@ cdef class RiemannSurfacePathPrimitive:
         complex[:]
 
         """
-        cdef int n, k
-        cdef double tim1
-        cdef complex xim1, xi
-        cdef complex[:] yim1, yi
-
         # get the closest checkpoint to the desired t-value
         i = self._nearest_checkpoint_index(t)
         tim1 = self._tcheckpoints[i]
@@ -426,9 +391,7 @@ cdef class RiemannSurfacePathPrimitive:
         yi = self.analytically_continue(xim1, yim1, xi)
         return yi
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cpdef complex integrate(self, Differential omega):
+    def integrate(self, omega):
         r"""Integrate `omega` on the path using its analytic continuator.
 
         Delegates integration to the path's
@@ -444,11 +407,9 @@ cdef class RiemannSurfacePathPrimitive:
         -------
         complex
         """
-        return self.AC.integrate(omega)
+        return self._AC.integrate(omega)
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cpdef complex[:] evaluate(self, Differential omega, double[:] t):
+    def evaluate(self, omega, t):
         r"""Evaluates `omega` along the path at `t` between 0 and 1.
 
         Parameters
@@ -463,7 +424,7 @@ cdef class RiemannSurfacePathPrimitive:
             The differential omega evaluated along the path at each of
             the points in `t`.
         """
-        omega_gamma = self.AC.parameterize(omega)
+        omega_gamma = self._AC.parameterize(omega)
         return omega_gamma(t)
 
     def plot_x(self, N=128, t0=0, t1=1, **kwds):
@@ -486,7 +447,7 @@ cdef class RiemannSurfacePathPrimitive:
         matplotlib lines array.
 
         """
-        t = numpy.linspace(t0,t1,N)
+        t = numpy.linspace(t0, t1, N)
         x = numpy.array([self.get_x(ti) for ti in t],
                         dtype=numpy.complex)
         fig = plt.figure()
@@ -514,7 +475,7 @@ cdef class RiemannSurfacePathPrimitive:
         matplotlib lines array.
 
         """
-        t = numpy.linspace(t0,t1,N)
+        t = numpy.linspace(t0, t1, N)
         y = numpy.array([self.get_y(ti)[0] for ti in t],
                         dtype=numpy.complex)
         fig = plt.figure()
@@ -600,9 +561,8 @@ cdef class RiemannSurfacePathPrimitive:
         return fig
 
 
-cdef class RiemannSurfacePathLine(RiemannSurfacePathPrimitive):
-    r"""A Riemann surface path for which the x-part of the path is a line
-    segment.
+class RiemannSurfacePathLine(RiemannSurfacePathPrimitive):
+    r"""A Riemann surface path for which the x-part of the path is a line segment.
 
     Attributes
     ----------
@@ -610,24 +570,23 @@ cdef class RiemannSurfacePathLine(RiemannSurfacePathPrimitive):
        The starting and ending points of the complex x-line.
 
     """
-    def __init__(self, RiemannSurface RS, complex x0, complex[:] y0,
-                 complex z0, complex z1, int ncheckpoints=16):
-        self.z0 = z0
-        self.z1 = z1
+    def __init__(self, RS, x0, y0, z0, z1, ncheckpoints=16):
+        self.z0 = numpy.complex(z0)
+        self.z1 = numpy.complex(z1)
         RiemannSurfacePathPrimitive.__init__(
             self, RS, x0, y0, ncheckpoints=ncheckpoints)
 
     def __repr__(self):
         return 'Line(%s,%s)'%(self.z0,self.z1)
 
-    cpdef complex get_x(self, double t):
+    def get_x(self, t):
         return self.z0*(1 - t) + self.z1*t
 
-    cpdef complex get_dxdt(self, double t):
+    def get_dxdt(self, t):
         return self.z1 - self.z0
 
 
-cdef class RiemannSurfacePathArc(RiemannSurfacePathPrimitive):
+class RiemannSurfacePathArc(RiemannSurfacePathPrimitive):
     r"""A Riemann surface path for which the x-part of the path is an arc.
 
     Attributes
@@ -646,29 +605,27 @@ cdef class RiemannSurfacePathArc(RiemannSurfacePathPrimitive):
         the arc length.
 
     """
-    def __init__(self, RiemannSurface RS, complex x0, complex[:] y0,
-                 complex R, complex w, complex theta, complex dtheta,
-                 int ncheckpoints=16):
-        self.R = R
-        self.w = w
-        self.theta = theta
-        self.dtheta = dtheta
+    def __init__(self, RS, x0, y0, R, w, theta, dtheta, ncheckpoints=16):
+        self.R = numpy.double(R)
+        self.w = numpy.complex(w)
+        self.theta = numpy.double(theta)
+        self.dtheta = numpy.double(dtheta)
         RiemannSurfacePathPrimitive.__init__(
             self, RS, x0, y0, ncheckpoints=ncheckpoints)
 
     def __repr__(self):
         return 'Arc(%s,%s,%s,%s)'%(self.R,self.w,self.theta,self.dtheta)
 
-    cpdef complex get_x(self, double t):
-        return self.R*cexp(1.0j*(self.theta + t*self.dtheta)) + \
+    def get_x(self, t):
+        return self.R*numpy.exp(1.0j*(self.theta + t*self.dtheta)) + \
             self.w
 
-    cpdef complex get_dxdt(self, double t):
+    def get_dxdt(self, t):
         return (self.R*1.0j*self.dtheta) * \
-            cexp(1.0j*(self.theta + t*self.dtheta))
+            numpy.exp(1.0j*(self.theta + t*self.dtheta))
 
 
-cdef class RiemannSurfacePathRay(RiemannSurfacePathPrimitive):
+class RiemannSurfacePathRay(RiemannSurfacePathPrimitive):
     r"""A Riemann surface path for which the x-part goes to infinity.
 
     Given a starting point :math:`x_0` the x-path :math:`\gamma_x :
@@ -680,8 +637,7 @@ cdef class RiemannSurfacePathRay(RiemannSurfacePathPrimitive):
         \gamma_x(t) = \frac{x_0}{1-t}
 
     """
-    def __init__(self, RiemannSurface RS, complex x0, complex[:] y0,
-                 int ncheckpoints=8):
+    def __init__(self, RS, x0, y0, ncheckpoints=8):
         RiemannSurfacePathPrimitive.__init__(
             self, RS, x0, y0, ncheckpoints=ncheckpoints)
 
@@ -691,16 +647,16 @@ cdef class RiemannSurfacePathRay(RiemannSurfacePathPrimitive):
     def set_analytic_continuator(self):
         self._AC = AnalyticContinuatorPuiseux(self._RS, self, infinity)
 
-    cpdef complex get_x(self, double t):
+    def get_x(self, t):
         if t == 1.0: t -= 1e-12
         return self._x0 / (1 - t)
 
-    cpdef complex get_dxdt(self, double t):
+    def get_dxdt(self, t):
         if t == 1.0: t -= 1e-12
         return -self._x0 / (1 - t)**2
 
 
-cdef class RiemannSurfacePath(RiemannSurfacePathPrimitive):
+class RiemannSurfacePath(RiemannSurfacePathPrimitive):
     r"""A continuous, piecewise differentiable path on a Riemann surface.
 
     RiemannSurfacePath is a composite of
@@ -714,20 +670,18 @@ cdef class RiemannSurfacePath(RiemannSurfacePathPrimitive):
     get_y
 
     """
-    def __init__(self, RiemannSurface RS, complex x0, complex[:] y0,
-                 RiemannSurfacePathPrimitive[:] segments):
-        # RiemannSurfacePath delegates all analytic continuation to each
-        # of its components, so we intialize its parent with a null
+    def __init__(self, RS, x0, y0, segments):
+        # RiemannSurfacePath delegates all analytic continuation to each of its
+        # components, so we intialize its parent with a null
         # AnalyticContinuator object.
         #
         # Additionally, setting ncheckpoints to "0" prevents
-        # self._initialize_checkpoints() from executing, which only
-        # makes sense on a single path segment / path primitive.
+        # self._initialize_checkpoints() from executing, which only makes sense
+        # on a single path segment / path primitive.
         RiemannSurfacePathPrimitive.__init__(self, RS, x0, y0, ncheckpoints=0)
 
-        # important: self._segments must be set after the parent
-        # intialization call since parent will set self._segments equal
-        # to "self"
+        # important: self._segments must be set after the parent intialization
+        # call since parent will set self._segments equal to "self"
         self._segments = segments
         self._nsegments = len(segments)
 
@@ -735,16 +689,15 @@ cdef class RiemannSurfacePath(RiemannSurfacePathPrimitive):
         s = ','.join(segment.__repr__() for segment in self._segments)
         return 'RiemannSurfacePath(' + s + ') on the ' + self.RS.__repr__()
 
-    cdef int _get_segment_index(self, double t):
-        r"""Returns the index of the path segment located at the given :math:`t
-        \in [0,1]`.
+    def _get_segment_index(self, t):
+        r"""Returns the index of the path segment located at the given :math:`t \in
+        [0,1]`.
 
         .. note::
 
-            This routine computes the appropriate path segment index
-            without resorting to branching. Such an approach is needed
-            since :math:`t = 1.0` should return the index of the final
-            segment.
+            This routine computes the appropriate path segment index without
+            resorting to branching. Such an approach is needed since :math:`t =
+            1.0` should return the index of the final segment.
 
         Parameters
         ----------
@@ -753,18 +706,16 @@ cdef class RiemannSurfacePath(RiemannSurfacePathPrimitive):
         Returns
         -------
         int
-            An integer between ``0`` and ``self._nsegments-1``
-            representing the index of the segment on which ``t`` lies.
+            An integer between ``0`` and ``self._nsegments-1`` representing the
+            index of the segment on which ``t`` lies.
 
         """
-        cdef int k = floor(t*self._nsegments)
-        cdef int diff = (self._nsegments - 1) - k
-        cdef int dsgn = diff >> 31
-        return k + (diff & dsgn)
+        k = numpy.int(numpy.floor(t*self._nsegments))
+        diff = (self._nsegments - 1) - k
+        dsgn = diff >> 31
+        return numpy.int(k + (diff & dsgn))
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cpdef complex get_x(self, double t):
+    def get_x(self, t):
         r"""Return the x-part of the path at :math:`t \in [0,1]`.
 
         Parameters
@@ -777,23 +728,18 @@ cdef class RiemannSurfacePath(RiemannSurfacePathPrimitive):
 
         Notes
         -----
-        This RiemannSurfacePath is parameterized for :math:`t \in
-        [0,1]`. However, internally, each segment is separately
-        parameterized for :math:`t \in [0,1]`. This routine performs an
-        appropriate scaling.
+        This RiemannSurfacePath is parameterized for :math:`t \in [0,1]`.
+        However, internally, each segment is separately parameterized for
+        :math:`t \in [0,1]`. This routine performs an appropriate scaling.
 
         """
-        cdef RiemannSurfacePathPrimitive seg_k
-        cdef complex x
-        cdef int k = self._get_segment_index(t)
-        cdef double t_seg = t*self._nsegments - k
+        k = self._get_segment_index(t)
+        t_seg = t*self._nsegments - k
         seg_k = self._segments[k]
         x = seg_k.get_x(t_seg)
         return x
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cpdef complex get_dxdt(self, double t):
+    def get_dxdt(self, t):
         r"""Return the derivative of the x-part of the path at :math:`t \in
         [0,1]`.
 
@@ -807,32 +753,26 @@ cdef class RiemannSurfacePath(RiemannSurfacePathPrimitive):
 
         Notes
         -----
-        This RiemannSurfacePath is parameterized for :math:`t \in
-        [0,1]`. However, internally, each segment is separately
-        parameterized for :math:`t \in [0,1]`. This routine
-        performs an appropriate scaling.
+        This RiemannSurfacePath is parameterized for :math:`t \in [0,1]`.
+        However, internally, each segment is separately parameterized for
+        :math:`t \in [0,1]`. This routine performs an appropriate scaling.
 
         .. warning::
 
            Riemann surface paths are only piecewise differentiable and
-           therefore may have discontinuous derivatives at the
-           boundaries. Therefore, it may be more useful to perform
-           segment-wise operations instead of operations on the whole of
-           this object.
+           therefore may have discontinuous derivatives at the boundaries.
+           Therefore, it may be more useful to perform segment-wise operations
+           instead of operations on the whole of this object.
 
 
         """
-        cdef RiemannSurfacePathPrimitive seg_k
-        cdef complex dxdt
-        cdef int k = self._get_segment_index(t)
-        cdef double t_seg = t*self._nsegments - k
+        k = self._get_segment_index(t)
+        t_seg = t*self._nsegments - k
         seg_k = self._segments[k]
         dxdt = seg_k.get_dxdt(t_seg)
         return dxdt
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cpdef complex[:] get_y(self, double t):
+    def get_y(self, t):
         r"""Return the y-fibre of the path at :math:`t \in [0,1]`.
 
         Parameters
@@ -845,23 +785,18 @@ cdef class RiemannSurfacePath(RiemannSurfacePathPrimitive):
 
         Notes
         -----
-        This RiemannSurfacePath is parameterized for
-        :math:`t \in [0,1]`. However, internally, each segment is
-        separately parameterized for :math:`t \in [0,1]`. This routine
-        performs an appropriate scaling.
+        This RiemannSurfacePath is parameterized for :math:`t \in [0,1]`.
+        However, internally, each segment is separately parameterized for
+        :math:`t \in [0,1]`. This routine performs an appropriate scaling.
 
         """
-        cdef RiemannSurfacePathPrimitive seg_k
-        cdef complex[:] y
-        cdef int k = self._get_segment_index(t)
-        cdef double t_seg = t*self._nsegments - k
+        k = self._get_segment_index(t)
+        t_seg = t*self._nsegments - k
         seg_k = self._segments[k]
         y = seg_k.get_y(t_seg)
         return y
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cpdef complex[:] evaluate(self, Differential omega, double[:] t):
+    def evaluate(self, omega, t):
         r"""Evaluates `omega` along the path at `N` uniform points.
 
         .. note::
@@ -881,25 +816,21 @@ cdef class RiemannSurfacePath(RiemannSurfacePathPrimitive):
         complex[:]
             The differential omega evaluated along the path at `N` points.
         """
-        cdef RiemannSurfacePathPrimitive segment
-        cdef int N = len(t)
-        cdef int nsegs = len(self.segments)
-        cdef int ppseg = int(N/nsegs)
-        cdef complex[:] values = numpy.zeros(nsegs*ppseg,dtype=complex)
-        cdef complex[:] values_seg = numpy.zeros(ppseg,dtype=complex)
-        cdef double[:] tseg = numpy.linspace(0,1,ppseg)
-        cdef int j,k
+        N = len(t)
+        nsegs = len(self.segments)
+        ppseg = int(N/nsegs)
+        values = numpy.zeros(nsegs*ppseg, dtype=numpy.complex)
+        values_seg = numpy.zeros(ppseg, dtype=numpy.complex)
+        tseg = numpy.linspace(0, 1, ppseg)
 
         for k in range(nsegs):
             segment = self.segments[k]
-            values_seg = segment.evaluate(omega,tseg)
+            values_seg = segment.evaluate(omega, tseg)
             for j in range(ppseg):
                 values[k*ppseg+j] = values_seg[j]
         return values
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cpdef complex integrate(self, Differential omega):
+    def integrate(self, omega):
         r"""Integrate `omega` on the path using its analytic continuator.
 
         Delegates integration to the path's
@@ -915,8 +846,7 @@ cdef class RiemannSurfacePath(RiemannSurfacePathPrimitive):
         -------
         complex
         """
-        cdef RiemannSurfacePathPrimitive segment
-        cdef complex integral = 0.0
+        integral = numpy.complex(0.0)
         for segment in self.segments:
             integral += segment.integrate(omega)
         return integral

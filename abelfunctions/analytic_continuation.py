@@ -26,26 +26,16 @@ Contents
 
 """
 
-cimport cython
 import numpy
-cimport numpy
 import scipy
 
-from .divisor import Place, DiscriminantPlace
-from .puiseux import puiseux
-from .riemann_surface cimport RiemannSurface
-from .riemann_surface_path cimport RiemannSurfacePathPrimitive
-from .utilities import matching_permutation
+from abelfunctions.divisor import Place, DiscriminantPlace
+from abelfunctions.puiseux import puiseux
+from abelfunctions.utilities import matching_permutation
 
 from sage.all import CC, QQbar, infinity
 
-cdef extern from 'complex.h':
-    double creal(complex)
-    double cimag(complex)
-    double cabs(complex)
-
-
-cdef class AnalyticContinuator:
+class AnalyticContinuator:
     r"""Abstract class for analytically continuing along a curve.
 
     An analytic continutator object dictates how to continue a y-fibre from one
@@ -66,14 +56,13 @@ cdef class AnalyticContinuator:
     analytically_continue
 
     """
-    def __init__(self, RiemannSurface RS, RiemannSurfacePathPrimitive gamma):
+    def __init__(self, RS, gamma):
         r"""AnalyticContinuators are initialized with a `RiemannSurface`."""
         self.RS = RS
         self.gamma = gamma
         self.deg = self.RS.deg
 
-    cpdef complex[:] analytically_continue(self, complex xi, complex[:] yi,
-                                           complex xip1):
+    def analytically_continue(self, xi, yi, xip1):
         r"""Analytically continues the fibre `yi` from `xi` to `xip1`.
 
         Parameters
@@ -94,7 +83,7 @@ cdef class AnalyticContinuator:
                                   'analytically_continue() method in '
                                   'subclass.')
 
-    def parameterize(self, Differential omega):
+    def parameterize(self, omega):
         r"""Returns the differential omega parameterized on the path.
 
         Given a differential math:`\omega = \omega(x,y)dx`, `parameterize`
@@ -118,10 +107,7 @@ cdef class AnalyticContinuator:
         raise NotImplementedError('Must implement AnalyticContinuator.'
                                   'integrate in subclass.')
 
-
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cpdef complex integrate(self, Differential omega):
+    def integrate(self, omega):
         r"""Integrate `omega` on the path using this analytic continuator.
 
         Parameters
@@ -136,7 +122,7 @@ cdef class AnalyticContinuator:
                                   'integrate in subclass.')
 
 
-cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
+class AnalyticContinuatorPuiseux(AnalyticContinuator):
     r"""Riemann surface path analytic continuation using Puiseux series.
 
     We must use Puiseux series in order to analytically continue a y-fibre to a
@@ -162,12 +148,11 @@ cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
     _compute_puisuex_series
 
     """
-    property target_place:
-        def __get__(self):
-            return self._target_place
+    @property
+    def target_place(self):
+        return self._target_place
 
-    def __init__(self, RiemannSurface RS, RiemannSurfacePathPrimitive gamma,
-                 discriminant_point):
+    def __init__(self, RS, gamma, discriminant_point):
         AnalyticContinuator.__init__(self, RS, gamma)
         self._target_place = None
         self.center = discriminant_point
@@ -210,10 +195,11 @@ cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
 
         # obtian the PuiseuxTSeries at x=b (the center)
         f = self.RS.f
-        x = self.RS.x
-        y = self.RS.y
         x0 = gamma.x0
         P = puiseux(f, self.center)
+
+        # XXX HACK - need to coerce input to CC
+        x0 = CC(x0)
 
         # compute enouge terms of each Puiseux series to accurately capture the
         # y-roots at x=a
@@ -236,19 +222,19 @@ cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
         place_idx = -1    # index of place corresponding to this x-series
         while px_idx >= 0:
             place_idx += 1
-            px_idx -= abs(ramification_indices[place_idx])
+            px_idx -= numpy.abs(ramification_indices[place_idx])
         self._target_place = DiscriminantPlace(self.RS,P[place_idx])
         return p
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cpdef complex[:] analytically_continue(self, complex xi, complex[:] yi,
-                                           complex xip1):
+    def analytically_continue(self, xi, yi, xip1):
+        # XXX HACK - need to coerce input to CC for puiseux series to evaluate
+        xi = CC(xi)
+        xip1 = CC(xip1)
+
         # return the current fibre if the step size is too small
-        if cabs(xip1-xi) < 1e-15:
+        if numpy.abs(xip1-xi) < 1e-15:
             return yi
 
-        cdef complex[:] yipi
         # simply evaluate the ordered puiseux series at xip1
         alpha = 0 if self.center == infinity else self.center
         yip1 = numpy.array([pj(xip1-alpha) for pj in self.puiseux_series],
@@ -256,7 +242,7 @@ cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
         return yip1
 
 
-    def parameterize(self, Differential omega):
+    def parameterize(self, omega):
         r"""Returns the differential omega parameterized on the path.
 
         Given a differential math:`\omega = \omega(x,y)dx`, `parameterize`
@@ -280,7 +266,7 @@ cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
         # localize the differential at the discriminant place
         P = self._target_place
         omega_local = omega.localize(P)
-        omega_local = omega_local.change_ring(CC)
+        omega_local = omega_local.laurent_polynomial().change_ring(CC)
 
         # extract relevant information about the Puiseux series
         p = P.puiseux_series
@@ -300,16 +286,17 @@ cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
         k = numpy.argmin(numpy.abs(ytprim - y0))
         tcoefficient = tall[k]
 
+        # XXX HACK - CC coercion
+        tcoefficient = CC(tcoefficient)
         def omega_gamma(s):
+            s = CC(s)
             dtds = -tcoefficient
-            return omega_local(tcoefficient*(1-s)) * dtds
+            val = omega_local(tcoefficient*(1-s)) * dtds
+            return numpy.complex(val)
+        return omega_gamma
 
-        return numpy.vectorize(omega_gamma, otypes=[complex])
 
-
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cpdef complex integrate(self, Differential omega):
+    def integrate(self, omega):
         r"""Integrate the differential along the underlying path.
 
         When integrating a holomorphic differential to place
@@ -323,5 +310,5 @@ cdef class AnalyticContinuatorPuiseux(AnalyticContinuator):
 
         """
         omega_gamma = self.parameterize(omega)
-        cdef complex value = scipy.integrate.romberg(omega_gamma,0,1)
-        return value
+        integral = scipy.integrate.romberg(omega_gamma,0,1)
+        return integral

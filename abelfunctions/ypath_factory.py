@@ -10,8 +10,6 @@ the Riemann surface.
 import numpy
 import scipy
 import networkx as nx
-import matplotlib
-import matplotlib.pyplot as plt
 
 from operator import itemgetter
 from abelfunctions.utilities import Permutation

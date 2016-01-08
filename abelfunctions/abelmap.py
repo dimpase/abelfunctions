@@ -99,12 +99,7 @@ Contents
 """
 import numpy
 
-from .divisor import Place, Divisor
-from .riemann_surface import RiemannSurface
-from .riemann_surface_path import RiemannSurfacePathPrimitive
-from .differentials import Differential
-from .utilities import cached_method
-
+from sage.all import cached_method
 
 def fractional_part(z, tol=1e-8):
     r"""Returns the fractional part of a vector.

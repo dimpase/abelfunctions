@@ -5,9 +5,14 @@ from abelfunctions.differentials import (
     mnuk_conditions,
     recenter_curve,
     differentials_numerators,
+    differentials
 )
 
 from sage.rings.rational_field import QQ
+
+class DummyRS:
+    def __init__(self, f):
+        self.f = f
 
 class TestDifferentialsNumerators(AbelfunctionsTestCase):
 
@@ -46,3 +51,22 @@ class TestDifferentialsNumerators(AbelfunctionsTestCase):
         a = differentials_numerators(self.f8)
         b = [y, x*y**3, x*y**4]
         self.assertEqual(a,b)
+
+class TestDifferentials(AbelfunctionsTestCase):
+
+    def test_f1(self):
+        x,y = self.f1.parent().gens()
+        dfdy = self.f1.derivative(y)
+        X = DummyRS(self.f1)
+        a = map(lambda omega: omega.as_expression(), differentials(X))
+        b = []
+        self.assertEqual(a,b)
+
+    def test_f2(self):
+        x,y = self.f2.parent().gens()
+        dfdy = self.f2.derivative(y)
+        X = DummyRS(self.f2)
+        a = map(lambda omega: omega.as_expression(), differentials(X))
+        b = [x*y/dfdy, x**3/dfdy]
+        self.assertEqual(a,b)
+

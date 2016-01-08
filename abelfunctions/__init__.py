@@ -8,9 +8,8 @@ The code is available as a git repository at
 
 """
 from abelfunctions.version import __version__
-
-# from abelfunctions.abelmap import AbelMap, Jacobian
-# from abelfunctions.puiseux import puiseux
-# from abelfunctions.riemann_constant_vector import RiemannConstantVector
-# from abelfunctions.riemann_surface import RiemannSurface
-# from abelfunctions.riemann_theta.riemann_theta import RiemannTheta
+#from abelfunctions.abelmap import AbelMap, Jacobian
+from abelfunctions.puiseux import puiseux
+#from abelfunctions.riemann_constant_vector import RiemannConstantVector
+from abelfunctions.riemann_surface import RiemannSurface
+#from abelfunctions.riemann_theta.riemann_theta import RiemannTheta

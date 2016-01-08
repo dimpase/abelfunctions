@@ -522,6 +522,5 @@ class RiemannSurfacePathFactory(object):
             segments.append(segment)
 
         # build the entire path from the path segments
-        segments = numpy.array(segments, dtype=RiemannSurfacePathPrimitive)
         gamma = RiemannSurfacePath(self.RS, x0, y0, segments)
         return gamma

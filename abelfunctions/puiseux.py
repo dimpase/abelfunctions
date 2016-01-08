@@ -37,6 +37,7 @@ Contents
 --------
 
 """
+import numpy
 import sympy
 
 from abelfunctions.puiseux_series_ring import PuiseuxSeriesRing
@@ -486,10 +487,11 @@ def puiseux(f, alpha, beta=None, order=None, parametric=True):
         falpha = f(x+alpha,y)
 
     # determine the points on the curve lying above x=alpha
+    R = falpha.parent()
+    x,y = R.gens()
     g, transform = almost_monicize(falpha)
-    galpha = g(0,y).univariate_polynomial()
+    galpha = R(g(0,y)).univariate_polynomial()
     betas = galpha.roots(ring=QQbar, multiplicities=False)
-    map(lambda x: x.exactify(), betas)
 
     # filter for requested value of beta. raise error if not found
     if not beta is None:
@@ -518,13 +520,9 @@ def puiseux(f, alpha, beta=None, order=None, parametric=True):
             # append to list of singular data
             singular_parts.append((G,P,Q))
 
-    # # instantiate PuiseuxTSeries from the singular data
+    # instantiate PuiseuxTSeries from the singular data
     series = [PuiseuxTSeries(f, alpha, singular_data, order=order)
               for singular_data in singular_parts]
-
-    # # return x-series representations if requested
-    # if not parametric:
-    #     series = [px for P in series for px in P.xseries()]
     return series
 
 
@@ -611,7 +609,8 @@ class PuiseuxTSeries(object):
         int
 
         """
-        return len(self.terms)
+        terms = self.ypart.laurent_polynomial().dict().items()
+        return len(terms)
 
 
     def __init__(self, f, x0, singular_data, order=None):
@@ -909,6 +908,7 @@ class PuiseuxTSeries(object):
             # break if both tolerances are satisfied. otherwise, add a term
             if (curve_error < curve_tol) and (rel_error < rel_tol):
                 break
+
             self.add_term()
             num_iter += 1
             yprev = yt

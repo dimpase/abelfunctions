@@ -486,7 +486,7 @@ class TestEvaluation(AbelfunctionsTestCase):
     def test_extend_to_t_oo(self):
         p = puiseux(self.f2,'oo')
         pi = p[0]
-        ti = 50
+        ti = 100
 
         # 1e-8
         pi.extend_to_t(ti, 1e-8)
@@ -495,9 +495,9 @@ class TestEvaluation(AbelfunctionsTestCase):
         error = abs(self.f2(xt,yt))
         self.assertLess(error, 1e-8)
 
-        # 1e-14
-        pi.extend_to_t(ti, curve_tol=1e-14)
+        # 1e-12
+        pi.extend_to_t(ti, curve_tol=1e-12)
         xt = pi.eval_x(ti)
         yt = pi.eval_y(ti)
         error = abs(self.f2(xt,yt))
-        self.assertLess(error, 1e-14)
+        self.assertLess(error, 1e-12)

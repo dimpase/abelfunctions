@@ -30,6 +30,8 @@ Contents
 
 """
 
+from sage.all import infinity
+
 def ZeroDivisor(X):
     r"""Returns a zero Divisor on X."""
     return Divisor(X,{})

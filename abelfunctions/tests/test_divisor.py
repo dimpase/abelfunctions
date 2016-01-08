@@ -4,7 +4,6 @@ from abelfunctions.divisor import (
 )
 
 
-
 class TestDivisor(AbelfunctionsTestCase):
 
     def setUp(self):

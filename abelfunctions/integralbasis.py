@@ -49,7 +49,7 @@ from abelfunctions.puiseux import puiseux
 from abelfunctions.puiseux_series_ring import PuiseuxSeriesRing
 from abelfunctions.utilities import cached_function
 
-from sage.all import infinity, SR
+from sage.all import infinity, SR, cached_function
 from sage.functions.other import ceil
 from sage.matrix.constructor import Matrix, zero_matrix
 from sage.rings.polynomial.all import PolynomialRing
@@ -82,7 +82,6 @@ def Int(i, px):
         if k != i:
             val += (pxi-px[k]).valuation()
     return val
-
 
 def compute_expansion_bounds(px):
     r"""Returns a list of necessary bounds on each Puiseux series in ``px``.
@@ -251,7 +250,7 @@ def _integral_basis_monic(f):
     r = []
     alpha = []
     for k in df:
-        alphak = k.roots(QQbar, multiplicities=False)[0]
+        alphak = k.roots(ring=QQbar, multiplicities=False)[0]
         alpha.append(alphak)
         rk = compute_series_truncations(f,alphak)
         r.append(rk)
@@ -278,10 +277,16 @@ def compute_bd(f, b, df, r, alpha):
     # ring is introduced.
     d = len(b)
     Q = PolynomialRing(QQbar, ['a%d'%n for n in range(d)] + ['dummy'])
-    a = Q.gens()
+    a = tuple(Q.gens())
+    b = tuple(b)
     P = PuiseuxSeriesRing(Q, str(x))
     xx = P.gen()
     bd = F(y*b[-1])
+
+    # XXX HACK
+    for l in range(len(r)):
+        for k in range(len(r[l])):
+            r[l][k] = r[l][k].change_ring(Q)
 
     # sufficiently singularize the current integral basis element guess at each
     # of the singular points of df
@@ -299,8 +304,8 @@ def compute_bd(f, b, df, r, alpha):
             # the expression A(x,rki))
             equations = []
             for rki in rk:
-                rki = rki.change_ring(Q)
-                A = sum(a[j] * b[j](xx,rki) for j in range(d))
+                #                A = sum(a[j] * b[j](xx,rki) for j in range(d))
+                A = evaluate_A(a,b,xx,rki,d)
                 A += bd(xx, rki)
 
                 # implicit division by x-alphak, hence truncation to x^1
@@ -318,6 +323,11 @@ def compute_bd(f, b, df, r, alpha):
                 sufficiently_singular = True
     return bd
 
+@cached_function
+def evaluate_A(a,b,xx,rki,d):
+    A = sum(a[j] * b[j](xx,rki) for j in range(d))
+    return A
+
 def solve_coefficient_system(Q, equations, vars):
     # NOTE: to make things easier (and uniform) in the univariate case a dummy
     # variable is added to the polynomial ring. See compute_bd()
@@ -326,8 +336,8 @@ def solve_coefficient_system(Q, equations, vars):
 
     # construct the coefficient system and right-hand side
     system = [[e.coefficient({ai:1}) for ai in a] for e in equations]
-    system = Matrix(B, system)
     rhs = [-e.constant_coefficient() for e in equations]
+    system = Matrix(B, system)
     rhs = Matrix(B, rhs).transpose()
 
     # we only allow unique solutions. return None if there are infinitely many

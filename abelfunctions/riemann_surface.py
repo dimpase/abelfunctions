@@ -12,36 +12,29 @@ import numpy
 import scipy
 import scipy.linalg
 
+import abelfunctions
 from abelfunctions.differentials import differentials
-from abelfunctions.differentials import Differential
-from abelfunctions.differentials cimport Differential
 from abelfunctions.divisor import Place, DiscriminantPlace, RegularPlace, Divisor
 from abelfunctions.puiseux import puiseux
-from abelfunctions.riemann_surface_path import RiemannSurfacePathPrimitive
-from abelfunctions.riemann_surface_path cimport RiemannSurfacePathPrimitive
 from abelfunctions.riemann_surface_path_factory import RiemannSurfacePathFactory
 from abelfunctions.singularities import genus
 
 from sage.all import QQbar, infinity
 
 
-cdef class RiemannSurface:
+class RiemannSurface(object):
     """A Riemann surface defined by a complex plane algebraic curve.
-
-    Attributes
-    ----------
-    f : sympy.Expression
-        The algebraic curve representing the Riemann surface.
     """
-    property f:
-        def __get__(self):
-            return self._f
-    property deg:
-        def __get__(self):
-            return self._deg
-    property PF:
-        def __get__(self):
-            return self.PathFactory
+
+    @property
+    def f(self):
+        return self._f
+    @property
+    def deg(self):
+        return self._deg
+    @property
+    def PF(self):
+        return self.PathFactory
 
     def __init__(self, f, base_point=None, base_sheets=None, kappa=2./5):
         """Construct a Riemann surface.
@@ -68,6 +61,7 @@ cdef class RiemannSurface:
         # set custom base point, if provided. otherwise, base_point is
         # set by self.discriminant_points()
         self._base_point = base_point
+        self._base_sheets = None
         self._discriminant_points = None
         self._discriminant_points_exact = None
         self.discriminant_points()  # sets the base point of the surface
@@ -84,8 +78,8 @@ cdef class RiemannSurface:
         self._riemann_matrix = None
         self._genus = None
         self._holomorphic_differentials = None
-        self.PathFactory = None #RiemannSurfacePathFactory(self)
-        
+        self.PathFactory = RiemannSurfacePathFactory(self)
+
     def __repr__(self):
         s = 'Riemann surface defined by f = %s'%(self.f)
         return s
@@ -406,8 +400,7 @@ cdef class RiemannSurface:
         """
         return self.PathFactory.path_to_place(P)
 
-    cpdef complex integrate(self, Differential omega,
-                            RiemannSurfacePathPrimitive gamma):
+    def integrate(self, omega, gamma):
         r"""Integrate the differential `omega` over the path `gamma`.
 
         Parameters
@@ -423,8 +416,7 @@ cdef class RiemannSurface:
             The integral of `omega` on `gamma`.
 
         """
-        cdef complex value = gamma.integrate(omega)
-        return value
+        return gamma.integrate(omega)
 
     def period_matrix(self):
         r"""Returns the period matrix of the Riemann surface.
@@ -445,21 +437,15 @@ cdef class RiemannSurface:
         if not (self._period_matrix is None):
             return self._period_matrix
 
-        print 'Computing c_cycles:'
         c_cycles, linear_combinations = self.c_cycles()
         oneforms = self.holomorphic_oneforms()
         c_periods = []
         g = self.genus()
         m = len(c_cycles)
-        print c_cycles
-        print
-
         for omega in oneforms:
             omega_periods = []
             for gamma in c_cycles:
-                print 'Computing c-period:'
                 omega_periods.append(self.integrate(omega, gamma))
-                print omega_periods
             c_periods.append(omega_periods)
 
         # take appropriate linear combinations of the c-periods to

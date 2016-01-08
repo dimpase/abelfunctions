@@ -22,9 +22,9 @@ Contents
 """
 from abelfunctions.puiseux import puiseux
 from abelfunctions.integralbasis import Int
-from abelfunctions.utilities import rootofsimp, cached_function
 
 from sage.all import I, pi
+from sage.misc.cachefunc import cached_function, cached_method
 from sage.rings.infinity import infinity
 from sage.rings.integer_ring import ZZ
 from sage.rings.qqbar import QQbar
@@ -53,7 +53,7 @@ def singular_points_finite(f):
     R = f.parent()
     x,y = R.gens()
     n  = f.degree(y)
-    res = R(f.resultant(f.derivative(y),y)).univariate_polynomial()
+    res = f.resultant(f.derivative(y),y).univariate_polynomial()
     xroots = res.roots(ring=QQbar, multiplicities=True)
     for xk,deg in xroots:
         if deg > 1:
