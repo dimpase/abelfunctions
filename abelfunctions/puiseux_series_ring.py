@@ -129,7 +129,7 @@ class PuiseuxSeriesRing_generic(commutative_ring.CommutativeRing):
         return s
 
     Element = PuiseuxSeries
-    def _element_constructor(self, x, a=0, e=1):
+    def _element_constructor(self, x, e=1):
         r"""Construct a Puiseux series from `x`.
 
         INPUT:
@@ -158,7 +158,7 @@ class PuiseuxSeriesRing_generic(commutative_ring.CommutativeRing):
         else:
             l = self.laurent_series_ring()(x)
 
-        return PuiseuxSeries(self, l, a=a, e=e)
+        return PuiseuxSeries(self, l, e=e)
 
 
     def _coerce_map_from_(self, P):

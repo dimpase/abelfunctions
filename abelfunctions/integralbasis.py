@@ -47,7 +47,6 @@ Contents
 
 from abelfunctions.puiseux import puiseux
 from abelfunctions.puiseux_series_ring import PuiseuxSeriesRing
-from abelfunctions.utilities import cached_function
 
 from sage.all import infinity, SR, cached_function
 from sage.functions.other import ceil
