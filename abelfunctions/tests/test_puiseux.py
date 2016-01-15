@@ -330,16 +330,18 @@ class TestPuiseux(AbelfunctionsTestCase):
 
     def test_PQ_f1(self):
         series = self.get_PQ(self.f1)
-        x = QQbar['x,y'](self.x)
-        y = QQbar['x,y'](self.y)
+        x,y = self.f1.parent().gens()
+        x = QQbar['x,y'](x)
+        y = QQbar['x,y'](y)
         self.assertItemsEqual(
             series,
             [(x**2, x**4*(x*(y + 1) + 1))])
 
     def test_PQ_f2(self):
         series = self.get_PQ(self.f2)
-        x = QQbar['x,y'](self.x)
-        y = QQbar['x,y'](self.y)
+        x,y = self.f2.parent().gens()
+        x = QQbar['x,y'](x)
+        y = QQbar['x,y'](y)
         self.assertItemsEqual(
             series,
             [(x, x**2*y),
@@ -347,8 +349,9 @@ class TestPuiseux(AbelfunctionsTestCase):
 
     def test_PQ_f2_oo(self):
         series = self.get_PQ(self.f2, a=infinity)
-        x = QQbar['x,y'](self.x)
-        y = QQbar['x,y'](self.y)
+        x,y = self.f2.parent().gens()
+        x = QQbar['x,y'](x)
+        y = QQbar['x,y'](y)
         self.assertItemsEqual(
             series,
             [(1/x**3, (x**2*y + x**2)/x**9)])
@@ -359,8 +362,9 @@ class TestPuiseux(AbelfunctionsTestCase):
 
     def test_PQ_f4(self):
         series = self.get_PQ(self.f4)
-        x = QQbar['x,y'](self.x)
-        y = QQbar['x,y'](self.y)
+        x,y = self.f4.parent().gens()
+        x = QQbar['x,y'](x)
+        y = QQbar['x,y'](y)
         self.assertItemsEqual(
             series,
             [(x, x*(y + 1)),
@@ -368,8 +372,9 @@ class TestPuiseux(AbelfunctionsTestCase):
 
     def test_PQ_f4_oo(self):
         series = self.get_PQ(self.f4, a=infinity)
-        x = QQbar['x,y'](self.x)
-        y = QQbar['x,y'](self.y)
+        x,y = self.f4.parent().gens()
+        x = QQbar['x,y'](x)
+        y = QQbar['x,y'](y)
         self.assertItemsEqual(
             series,
             [(1/(-x**2), (x*y + x)/x**4)])
@@ -380,8 +385,9 @@ class TestPuiseux(AbelfunctionsTestCase):
         r0,r1,r2 = (t**3 - t**2 + 1).roots(QQbar, multiplicities=False)
 
         series = self.get_PQ(self.f7)
-        x = QQbar['x,y'](self.x)
-        y = QQbar['x,y'](self.y)
+        x,y = self.f7.parent().gens()
+        x = QQbar['x,y'](x)
+        y = QQbar['x,y'](y)
         self.assertItemsEqual(
             series,
             [(x, y + r0),
@@ -390,24 +396,27 @@ class TestPuiseux(AbelfunctionsTestCase):
 
     def test_PQ_f22(self):
         series = self.get_PQ(self.f22)
-        x = QQbar['x,y'](self.x)
-        y = QQbar['x,y'](self.y)
+        x,y = self.f22.parent().gens()
+        x = QQbar['x,y'](x)
+        y = QQbar['x,y'](y)
         self.assertItemsEqual(
             series,
             [(x**3, x**5*(y + 1))])
 
     def test_PQ_f22_oo(self):
         series = self.get_PQ(self.f22, a=infinity)
-        x = QQbar['x,y'](self.x)
-        y = QQbar['x,y'](self.y)
+        x,y = self.f2.parent().gens()
+        x = QQbar['x,y'](x)
+        y = QQbar['x,y'](y)
         self.assertItemsEqual(
             series,
             [(1/x**3, (x*y + x)/x**6)])
 
     def test_PQ_f23(self):
         series = self.get_PQ(self.f23)
-        x = QQbar['x,y'](self.x)
-        y = QQbar['x,y'](self.y)
+        x,y = self.f23.parent().gens()
+        x = QQbar['x,y'](x)
+        y = QQbar['x,y'](y)
         self.assertItemsEqual(
             series,
             [(x, x*(x*y + 2) + 1),
@@ -415,8 +424,9 @@ class TestPuiseux(AbelfunctionsTestCase):
 
     def test_PQ_f23_oo(self):
         series = self.get_PQ(self.f23, a=infinity)
-        x = QQbar['x,y'](self.x)
-        y = QQbar['x,y'](self.y)
+        x,y = self.f23.parent().gens()
+        x = QQbar['x,y'](x)
+        y = QQbar['x,y'](y)
         self.assertItemsEqual(
             series,
             [(1/x,y/x**7), (1/x,(1+y)/x**7)])
@@ -427,8 +437,9 @@ class TestPuiseux(AbelfunctionsTestCase):
         sqrt2 = (t**2 - 2).roots(QQbar, multiplicities=False)[0]
 
         series = self.get_PQ(self.f27)
-        x = QQbar['x,y'](self.x)
-        y = QQbar['x,y'](self.y)
+        x,y = self.f27.parent().gens()
+        x = QQbar['x,y'](x)
+        y = QQbar['x,y'](y)
         self.assertItemsEqual(
             series,
             [(x, x*(y + sqrt2)),
@@ -437,23 +448,16 @@ class TestPuiseux(AbelfunctionsTestCase):
              (x**3/2, x*(y + 1))])
 
     def test_hyperelliptic_oo(self):
-        x = self.x
-        y = self.y
+        R = QQ['x,y']
+        x,y = R.gens()
         f = y**2 - (x**2 - 9)*(x**2 - 4)*(x**2 - 1)
         series = self.get_PQ(f,a=infinity)
-        x = QQbar['x,y'](self.x)
-        y = QQbar['x,y'](self.y)
+        x = QQbar['x,y'](x)
+        y = QQbar['x,y'](y)
         self.assertItemsEqual(
             series,
             [(1/x, (y+1)/x**3),
              (1/x, (y-1)/x**3)])
-
-# class TestPuiseuxTSeries(unittest.TestCase):
-#     def test_instantiation(self):
-#         # test that the x- and y-parts are instantiated correctly given
-#         # the output of puiseux()
-#         pass
-
 
 class TestEvaluation(AbelfunctionsTestCase):
 

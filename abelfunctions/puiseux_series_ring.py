@@ -31,6 +31,7 @@ Contents
 """
 import weakref
 
+from sage.all import parent
 import sage.rings.commutative_ring as commutative_ring
 import sage.rings.integral_domain as integral_domain
 import sage.rings.ring as ring
@@ -50,9 +51,9 @@ from sage.rings.power_series_ring import (
     is_PowerSeriesRing,
     PowerSeriesRing,
 )
+from sage.rings.power_series_ring_element import is_PowerSeries
 
 
-################################################################################
 puiseux_series = {}
 def PuiseuxSeriesRing(base_ring, name=None, names=None, default_prec=None, sparse=False):
     if not names is None: name = names
@@ -80,12 +81,11 @@ def PuiseuxSeriesRing(base_ring, name=None, names=None, default_prec=None, spars
     puiseux_series[key] = weakref.ref(R)
     return R
 
-################################################################################
+
 def is_PuiseuxSeriesRing(x):
     return isinstance(x, PuiseuxSeriesRing_generic)
 
 
-################################################################################
 class PuiseuxSeriesRing_generic(commutative_ring.CommutativeRing):
     def __init__(self, base_ring, name=None, default_prec=None, sparse=False,
                  category=None):
@@ -93,8 +93,8 @@ class PuiseuxSeriesRing_generic(commutative_ring.CommutativeRing):
             self, base_ring, names=name,
             category=getattr(self, '_default_category', Fields()))
 
-        # If self is R(( (x-a)^(1/e) )) then the corresponding Laurent series
-        # ring will be R(( (x-a) ))
+        # If self is R(( x^(1/e) )) then the corresponding Laurent series
+        # ring will be R(( x ))
         self._laurent_series_ring = LaurentSeriesRing(
             base_ring, name=name, default_prec=default_prec, sparse=sparse)
 
@@ -129,7 +129,7 @@ class PuiseuxSeriesRing_generic(commutative_ring.CommutativeRing):
         return s
 
     Element = PuiseuxSeries
-    def _element_constructor(self, x, e=1):
+    def _element_constructor_(self, x, e=1):
         r"""Construct a Puiseux series from `x`.
 
         INPUT:
@@ -142,24 +142,29 @@ class PuiseuxSeriesRing_generic(commutative_ring.CommutativeRing):
         """
         P = parent(x)
 
-        # 1. x is a Puiseux series with the same base ring
-        if is_PuiseuxSeries(x) and P is self:
-            l = x.laurent_part
-            a = x.center
+        # 1. x is a Puiseux series belonging to this ring
+        if isinstance(x, self.element_class) and P is self:
+            return x
+        # 2. x is a Puiseux series but not an element of this ring. the laurent
+        #    part should be coercible to the laurent series ring of self
+        elif isinstance(x, self.element_class):
+            l = self.laurent_series_ring()(x.laurent_part)
             e = x.ramification_index
-        # 2. x is a member of the base ring XXX
-        elif P in self.base_ring():
+        # 3. x is a member of the base ring then convert x to a laurent series
+        #    and set the ramificaiton index of the Puiseux series to 1.
+        elif P is self.base_ring():
             l = self.laurent_series_ring()(x)
-        # 3. x is a Laurent or power series with the same base ring
+            e = 1
+        # 4. x is a Laurent or power series with the same base ring
         elif ((is_LaurentSeries(x) or is_PowerSeries(x))
               and P is self.base_ring()):
             l = self.laurent_series_ring()(x)
-        # 4. everything else: try to coerce to laurent series ring
+        # 5. everything else: try to coerce to laurent series ring
         else:
             l = self.laurent_series_ring()(x)
+            e = 1
 
-        return PuiseuxSeries(self, l, e=e)
-
+        return self.element_class(self, l, e=e)
 
     def _coerce_map_from_(self, P):
         r"""Return a coercion map from `P` to `self`, or `True`, or `None`.
@@ -194,12 +199,12 @@ class PuiseuxSeriesRing_generic(commutative_ring.CommutativeRing):
             and A.has_coerce_map_from(P.base_ring())):
             return True
 
-        # other Puiseux series rings with the same variable name and
-        # center. Puiseux series rings with difference ramification indices are
-        # coercible to each other.
-        if (is_PuiseuxSeriesRing(P) and
-            P.variable_name() == self.variable_name()):
-            return True
+        # # other Puiseux series rings with the same variable name and
+        # # center. Puiseux series rings with difference ramification indices are
+        # # coercible to each other.
+        # if (is_PuiseuxSeriesRing(P) and
+        #     P.variable_name() == self.variable_name()):
+        #     return True
 
     def gen(self, n=0):
         if n != 0:
@@ -207,8 +212,8 @@ class PuiseuxSeriesRing_generic(commutative_ring.CommutativeRing):
         try:
             return self.__generator
         except AttributeError:
-            l = self.laurent_series_ring()([0,1])
-            self.__generator = PuiseuxSeries(self, l, 0, 1)
+            #l = self.laurent_series_ring()([0,1])
+            self.__generator = PuiseuxSeries(self, [0,1], e=1)
             return self.__generator
 
     def ngens(self):

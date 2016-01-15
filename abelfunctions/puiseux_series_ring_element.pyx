@@ -149,7 +149,7 @@ cdef class PuiseuxSeries(AlgebraElement):
 
         """
         AlgebraElement.__init__(self, parent)
-        self._parent = parent
+#        self._parent = parent
 
         # if is_PuiseuxSeries(f):
         #     l = parent.laurent_series_ring()(f.laurent_part)
@@ -165,23 +165,26 @@ cdef class PuiseuxSeries(AlgebraElement):
             else:
                 l = parent.laurent_series_ring()((<PuiseuxSeries>f).__l)
                 e = parent.laurent_series_ring()((<PuiseuxSeries>f).__e)
-        elif isinstance(f, LaurentSeries):
-            l = f(parent.gen())
         else:
             l = parent.laurent_series_ring()(f)
 
         self.__l = l
-        self.__lp = l.laurent_polynomial()
-        self.__e = e
+        self.__e = long(e)
+        # try:
+        #     self.__l = l
+        #     self.__e = long(e)
+        # except:
+        #     print l
+        #     print e
 
     def __reduce__(self):
-        return make_element_from_parent, (self._parent, self.__l, self.__e)
+        return make_element_from_parent, (self.parent(), self.__l, self.__e)
 
     def _im_gens_(self, codomain, im_gens):
         return codomain(self(im_gens[0]))
 
     def _repr_(self):
-        x = self._parent.variable_name()
+        x = self.parent().variable_name()
         X = x
 
         # extract coefficients and exponets of the laurent part.
@@ -255,10 +258,10 @@ cdef class PuiseuxSeries(AlgebraElement):
 
     def __call__(self, x):
         r"""Evaluate this Puiseux series."""
-        t = x**(1/self.__e)
-        return self.__lp.truncate()(t)
+        t = x**(QQ(1)/self.__e)
+        return self.__l.laurent_polynomial()(t)
 
-    def _common_ramification_index(self, right):
+    def _common_ramification_index(self, PuiseuxSeries right):
         r"""Returns a ramification index common to self and right.
 
         In order to perform arithmetic on Puiseux series it is useful to find a
@@ -283,107 +286,68 @@ cdef class PuiseuxSeries(AlgebraElement):
             Scaling factors on self and right, respectively.
 
         """
-        m = self.ramification_index
-        n = right.ramification_index
+        m = self.__e
+        n = right.__e
         g = gcd(QQ(1)/m,QQ(1)/n).denominator()
         m = g/m
         n = g/n
         return g, m, n
 
-    # def _add_(self, right):
-    #     # find a common ramification index and transform the two underlying
-    #     # Laurent series
-    #     x = self._parent.laurent_series_ring().gen()
-    #     g, M, N = self._common_ramification_index(right)
-    #     l1 = self.__l(x**M)
-    #     l2 = right.__l(x**N)
-    #     l = l1 + l2
-    #     return PuiseuxSeries(self._parent, l, g)
-
     cpdef ModuleElement _add_(self, ModuleElement right_m):
         cdef PuiseuxSeries right = <PuiseuxSeries>right_m;
-        cdef LaurentSeries x = self._parent.laurent_series_ring().gen()
         cdef LaurentSeries l, l1, l2
         cdef long g, m, n
 
         g, m, n = self._common_ramification_index(right)
-        l1 = self.__l(x**m)
-        l2 = right.__l(x**n)
+        l1 = self.__l.V(m)
+        l2 = right.__l.V(n)
         l = l1 + l2
         return PuiseuxSeries(self._parent, l, g)
 
-
-    # def _sub_(self, right):
-    #     # find a common ramification index
-    #     x = self._parent.laurent_series_ring().gen()
-    #     g, M, N = self._common_ramification_index(right)
-    #     l1 = self.__l(x**M)
-    #     l2 = right.__l(x**N)
-    #     l = l1 - l2
-    #     return PuiseuxSeries(self._parent, l, g)
-
     cpdef ModuleElement _sub_(self, ModuleElement right_m):
         cdef PuiseuxSeries right = <PuiseuxSeries>right_m;
-        cdef LaurentSeries x = self._parent.laurent_series_ring().gen()
         cdef LaurentSeries l, l1, l2
         cdef long g, m, n
 
         g, m, n = self._common_ramification_index(right)
-        l1 = self.__l(x**m)
-        l2 = right.__l(x**n)
+        l1 = self.__l.V(m)
+        l2 = right.__l.V(n)
         l = l1 - l2
         return PuiseuxSeries(self._parent, l, g)
 
-    # def _mul_(self, right):
-    #     # find a common ramification index
-    #     x = self._parent.laurent_series_ring().gen()
-    #     g, M, N = self._common_ramification_index(right)
-    #     l1 = self.__l(x**M)
-    #     l2 = right.__l(x**N)
-    #     l = l1 * l2
-    #     return PuiseuxSeries(self._parent, l, g)
-
     cpdef RingElement _mul_(self, RingElement right_r):
         cdef PuiseuxSeries right = <PuiseuxSeries>right_r;
-        cdef LaurentSeries x = self._parent.laurent_series_ring().gen()
         cdef LaurentSeries l, l1, l2
         cdef long g, m, n
 
         g, m, n = self._common_ramification_index(right)
-        l1 = self.__l(x**m)
-        l2 = right.__l(x**n)
+        l1 = self.__l.V(m)
+        l2 = right.__l.V(n)
         l = l1 * l2
         return PuiseuxSeries(self._parent, l, g)
 
-    # cpdef ModuleElement _rmul_(self, RingElement c):
-    #     return PuiseuxSeries(self._parent, self.__l._rmul_(c), self.__e)
+    cpdef ModuleElement _rmul_(self, RingElement c):
+        return PuiseuxSeries(self._parent, self.__l._rmul_(c), self.__e)
 
-    # cpdef ModuleElement _lmul_(self, RingElement c):
-    #     return PuiseuxSeries(self._parent, self.__l._lmul_(c), self.__e)
-
-
-    # def _div_(self, right):
-    #     # find a common ramification index
-    #     x = self._parent.laurent_series_ring().gen()
-    #     g, M, N = self._common_ramification_index(right)
-    #     l1 = self.__l(x**M)
-    #     l2 = right.__l(x**N)
-    #     l = l1 / l2
-    #     return PuiseuxSeries(self._parent, l, g)
+    cpdef ModuleElement _lmul_(self, RingElement c):
+        return PuiseuxSeries(self._parent, self.__l._lmul_(c), self.__e)
 
     cpdef RingElement _div_(self, RingElement right_r):
         cdef PuiseuxSeries right = <PuiseuxSeries>right_r;
-        cdef LaurentSeries x = self._parent.laurent_series_ring().gen()
         cdef LaurentSeries l, l1, l2
         cdef long g, m, n
 
         g, m, n = self._common_ramification_index(right)
-        l1 = self.__l(x**m)
-        l2 = right.__l(x**n)
+        l1 = self.__l.V(m)
+        l2 = right.__l.V(n)
         l = l1 / l2
         return PuiseuxSeries(self._parent, l, g)
 
-    def __pow__(self, r, dummy):
+    def __pow__(_self, r, dummy):
+        cdef PuiseuxSeries self = _self
+        cdef LaurentSeries l
+        cdef long e
+
         r = QQ(r)
         numer = r.numerator()
         denom = r.denominator()
@@ -392,7 +356,6 @@ cdef class PuiseuxSeries(AlgebraElement):
         if denom == 1:
             l = self.__l**int(numer)
             e = self.__e
-
         # otherwise, we only exponentiate by a rational number if there is a
         # single term in the Puiseux series
         #
@@ -400,24 +363,34 @@ cdef class PuiseuxSeries(AlgebraElement):
         else:
             if not self.is_monomial():
                 raise ValueError('Can only exponentiate single term by rational')
-
-            x = self._parent.laurent_series_ring().gen()
-            l = self.__l(x**numer)
-            e = self.__e * denom
+            l = self.__l.V(numer)
+            e = self.__e * int(denom)
         return PuiseuxSeries(self._parent, l, e)
 
     cpdef int _cmp_(self, Element right_r) except -2:
+        r"""Comparison of self and right.
+
+        As with Laurent series, two Puiseux series are equal if they agree for
+        all coefficients up to the minimum of the precisions of each.
+        """
         # scale each laurent series by their ramification indices and compare
         # the laurent series.
-        cdef PuiseuxSeries left_p, right_p
-        cdef LaurentSeries left_l, right_l
-        cdef LaurentSeries x
+        cdef PuiseuxSeries right = <PuiseuxSeries>right_r
+        exponents_l = self.exponents()
+        exponents_r = right.exponents()
+        coefficients_l = self.coefficients()
+        coefficients_r = right.coefficients()
+        d = min(len(exponents_l), len(exponents_r))
 
-        right_p = <PuiseuxSeries>right_r
-        x = self.__l.parent().gen()
-        left_l = self.__l(x**self.__e)
-        right_l = right_p.__l(x**right_p.ramification_index)
-        return cmp(left_l, right_l)
+        # first compare each exponent and then each coefficient
+        for i in range(d):
+            c = cmp(exponents_l[i], exponents_r[i])
+            if c:
+                return c
+            c = cmp(coefficients_l[i], coefficients_r[i])
+            if c:
+                return c
+        return 0
 
     def __lshift__(self, r):
         return self.shift(r)
@@ -454,7 +427,7 @@ cdef class PuiseuxSeries(AlgebraElement):
         if isinstance(r, slice):
             start, stop, step = r.start, r.stop, r.step
             n = slice(start*self.__e, stop*self.__e, step*self.__e)
-            return PuiseuxSeries(self._parent, self.__l[start:stop:step], self.__e)
+            return PuiseuxSeries(self.parent(), self.__l[start:stop:step], self.__e)
         else:
             n = int(r*self.__e)
             return self.__l[n]
@@ -463,10 +436,10 @@ cdef class PuiseuxSeries(AlgebraElement):
         return iter(self.__l)
 
     def __copy__(self):
-        return PuiseuxSeries(self._parent, self.__l.copy(), self.__e)
+        return PuiseuxSeries(self.parent(), self.__l.copy(), self.__e)
 
     def valuation(self):
-        val = self.__l.valuation() / self.__e
+        val = self.__l.valuation() / QQ(self.__e)
         if val == infinity:
             return 0
         return val
@@ -475,10 +448,10 @@ cdef class PuiseuxSeries(AlgebraElement):
         if prec == infinity or prec >= self.prec():
             return self
         l = self.__l.add_bigoh(prec*self.__e)
-        return PuiseuxSeries(self._parent, l, self.__e)
+        return PuiseuxSeries(self.parent(), l, self.__e)
 
     def change_ring(self, R):
-        return self._parent.change_ring(R)(self)
+        return self.parent().change_ring(R)(self)
 
     def is_unit(self):
         return self.__l.is_unit() and self.__e == 1
@@ -488,28 +461,6 @@ cdef class PuiseuxSeries(AlgebraElement):
 
     def is_monomial(self):
         return self.__l.is_monomial()
-
-    def __normalize(self):
-        r"""Normalize the Puiseux series.
-
-        A Puiseux series `p(x)` is a tuple `(l(x), a, e)` such that .. math::
-
-            p(x) = l((x-a)^{1/e}).
-
-        Normalization makes use that the ramificaiton index is integral.
-        """
-        if self.is_zero():
-            return
-
-        if self.__e.denominator() == 1:
-            return
-
-        n = self.__e.numerator()
-        d = self.__e.denominator()
-        self.__e = n
-
-        x = self.__l.parent().gen()
-        self.__l = self.__l(x**n)
 
     def list(self):
         return self.__l.list()
@@ -554,8 +505,8 @@ cdef class PuiseuxSeries(AlgebraElement):
         r"""Returns this Puiseux series multiplied by `x^r`.
 
         """
-        l = self.__l.shift(r*self.__e)
-        return PuiseuxSeries(self._parent, l, self.__e)
+        cdef LaurentSeries l = self.__l.shift(r*self.__e)
+        return PuiseuxSeries(self.parent(), l, self.__e)
 
     def truncate(self, r):
         r"""Returns the Puiseux series of degree ` < r`.
@@ -563,7 +514,7 @@ cdef class PuiseuxSeries(AlgebraElement):
         This is equivalent to self modulo `x^r`.
         """
         l = self.__l.truncate(r*self.__e)
-        return PuiseuxSeries(self._parent, l, self.__e)
+        return PuiseuxSeries(self.parent(), l, self.__e)
 
     def prec(self):
         if self.__l.prec() == infinity:
@@ -594,7 +545,7 @@ cdef class PuiseuxSeries(AlgebraElement):
         return min(self.prec(), p.prec())
 
     def variable(self):
-        return self._parent.variable_name()
+        return self.parent().variable_name()
 
     def laurent_series(self):
         r"""If self is a Laurent series, return it as a Laurent series."""

@@ -12,6 +12,20 @@ print '''
 ===== Testing Sageify =====
 ===========================
 '''
+
+###############################################################################
+# from abelfunctions.puiseux_series_ring import PuiseuxSeriesRing
+# from sage.all import CC, QQ
+# R = PuiseuxSeriesRing(QQ, 'x')
+# S = PuiseuxSeriesRing(CC, 'x')
+# x = R.gen()
+# half = QQ(1)/2
+# p = x**(-half) + 1 + x + half*x**(5*half)
+# S = PuiseuxSeriesRing(CC, 'x')
+# q = p.change_ring(S)
+
+
+
 ###############################################################################
 from abelfunctions.integralbasis import integral_basis
 import cProfile

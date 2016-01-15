@@ -25,21 +25,110 @@ import sys
 import shutil
 import unittest
 import build_system
-
 from distutils.core import Command
 
+# include every conceivable directory that may contains sage headers
 SAGE_ROOT = os.environ['SAGE_ROOT']
 SAGE_LOCAL = os.environ['SAGE_LOCAL']
-
-INCLUDES = [os.path.join(SAGE_ROOT,'devel','sage','sage','ext'),
-            os.path.join(SAGE_ROOT,'devel','sage'),
-            os.path.join(SAGE_ROOT,'devel','sage','sage','gsl'),
-            os.path.join(SAGE_LOCAL,'include','csage'),
+INCLUDES = [os.path.join(SAGE_ROOT),
+            os.path.join(SAGE_ROOT,'src'),
+            os.path.join(SAGE_ROOT,'src','sage'),
+            os.path.join(SAGE_ROOT,'src','sage','ext'),
+            os.path.join(SAGE_ROOT,'src','sage','ext','interrupt'),
             os.path.join(SAGE_LOCAL,'include'),
             os.path.join(SAGE_LOCAL,'include','python')]
 INCLUDES_NUMPY = [os.path.join(SAGE_LOCAL,'lib','python','site-packages',
                                'numpy','core','include')]
 
+# additional commands for building cython modules
+if '-ba' in sys.argv:
+    print "Rebuilding all Cython extensions."
+    sys.argv.remove('-ba')
+    FORCE = True
+else:
+    FORCE = False
+
+# custom define an extension to use the custom build system
+def Extension(*args, **kwds):
+    if not kwds.has_key('include_dirs'):
+        kwds['include_dirs'] = INCLUDES
+    else:
+        kwds['include_dirs'] += INCLUDES
+    if not kwds.has_key('force'):
+        kwds['force'] = FORCE
+
+    # Disable warnings when running GCC step -- cython has already parsed the code and
+    # generated any warnings; the GCC ones are noise.
+    if not kwds.has_key('extra_compile_args'):
+        kwds['extra_compile_args'] = ['-w']
+    else:
+        kwds['extra_compile_args'].append('-w')
+
+    E = build_system.Extension(*args, **kwds)
+#    E.libraries = ['csage'] + E.libraries
+    return E
+
+
+packages = [
+#    'abelfunctions.riemann_theta',
+#    'abelfunctions.utilities',
+    ]
+
+ext_modules = [
+    # Extension('abelfunctions.riemann_surface',
+    #           sources=[os.path.join('abelfunctions','riemann_surface.pyx')]
+    #       ),
+    # Extension('abelfunctions.riemann_surface_path',
+    #           sources=[os.path.join('abelfunctions','riemann_surface_path.pyx')]
+    #       ),
+    # Extension('abelfunctions.analytic_continuation',
+    #           sources=[os.path.join('abelfunctions',
+    #                                 'analytic_continuation.pyx')]
+    #       ),
+    # Extension('abelfunctions.analytic_continuation_smale',
+    #           sources=[os.path.join('abelfunctions',
+    #                                 'analytic_continuation_smale.pyx')]
+    #       ),
+    # Extension('abelfunctions.polynomials',
+    #           sources=[os.path.join('abelfunctions','polynomials.pyx')]
+    #       ),
+    # Extension('abelfunctions.differentials',
+    #           sources=[os.path.join('abelfunctions','differentials.pyx')]
+    #       ),
+    Extension('abelfunctions.puiseux_series_ring_element',
+              sources=[os.path.join('abelfunctions','puiseux_series_ring_element.pyx')],
+              extra_compile_args = ['-std=c99']
+          ),
+    # Extension('abelfunctions.riemann_theta.radius',
+    #           sources=[os.path.join('abelfunctions','riemann_theta',
+    #                                 'lll_reduce.c'),
+    #                    os.path.join('abelfunctions','riemann_theta',
+    #                                 'radius.pyx')]
+    #       ),
+    # Extension('abelfunctions.riemann_theta.integer_points',
+    #           sources=[os.path.join('abelfunctions','riemann_theta',
+    #                                 'integer_points.pyx')]
+    #       ),
+    # Extension('abelfunctions.riemann_theta.riemann_theta',
+    #           sources=[os.path.join('abelfunctions','riemann_theta',
+    #                                 'finite_sum.c'),
+    #                    os.path.join('abelfunctions','riemann_theta',
+    #                                 'riemann_theta.pyx')]
+    #       ),
+    ]
+
+# parameters for all extension modules:
+#
+# * use all include directories in INCLUDES
+# * disable warnings in gcc step
+for mod in ext_modules:
+    mod.include_dirs.extend(INCLUDES)
+    mod.extra_compile_args.append('-w')
+
+tests = [
+    'abelfunctions.tests',
+#    'abelfunctions.riemanntheta.tests',
+    ]
 
 class clean(Command):
     """Cleans files so you should get the same copy as in git."""
@@ -53,6 +142,7 @@ class clean(Command):
         pass
 
     def run(self):
+        print 'Cleaning abelfunctions...'
         # delete all files ending with certain extensions
         # currently: '.pyc', '~'
         dir_setup = os.path.dirname(os.path.realpath(__file__))
@@ -77,8 +167,8 @@ class clean(Command):
 
         os.chdir(dir_setup)
 
-        # delete temporary cython .c files. be careful to only delete the .c
-        # files corresponding to .pyx files. (keep other .c files)
+        # delete temporary cython .c and .cpp files. be careful to only delete
+        # the .c and .cpp files corresponding to .pyx files.
         ext_sources = [f for ext in ext_modules for f in ext.sources]
         for file in ext_sources:
             file = os.path.join(dir_setup, file)
@@ -87,6 +177,9 @@ class clean(Command):
                 file_c = root + '.c'
                 if os.path.isfile(file_c):
                     os.remove(file_c)
+                file_cpp = root + '.cpp'
+                if os.path.isfile(file_cpp):
+                    os.remove(file_cpp)
 
         os.chdir(dir_setup)
 
@@ -122,98 +215,6 @@ class test_abelfunctions(Command):
         errno = not result.wasSuccessful()
         sys.exit(errno)
 
-
-if '-ba' in sys.argv:
-    print "Rebuilding all Cython extensions."
-    sys.argv.remove('-ba')
-    FORCE = True
-else:
-    FORCE = False
-
-def Extension(*args, **kwds):
-    if not kwds.has_key('include_dirs'):
-        kwds['include_dirs'] = INCLUDES
-    else:
-        kwds['include_dirs'] += INCLUDES
-    if not kwds.has_key('force'):
-        kwds['force'] = FORCE
-
-    # Disable warnings when running GCC step -- cython has already parsed the code and
-    # generated any warnings; the GCC ones are noise.
-    if not kwds.has_key('extra_compile_args'):
-        kwds['extra_compile_args'] = ['-w']
-    else:
-        kwds['extra_compile_args'].append('-w')
-
-    E = build_system.Extension(*args, **kwds)
-    E.libraries = ['csage'] + E.libraries
-    return E
-
-
-
-packages = [
-#    'abelfunctions.riemann_theta',
-#    'abelfunctions.utilities',
-    ]
-
-ext_modules = [
-    # Extension('abelfunctions.riemann_surface',
-    #           sources=[os.path.join('abelfunctions','riemann_surface.pyx')]
-    #       ),
-    # Extension('abelfunctions.riemann_surface_path',
-    #           sources=[os.path.join('abelfunctions','riemann_surface_path.pyx')]
-    #       ),
-    # Extension('abelfunctions.analytic_continuation',
-    #           sources=[os.path.join('abelfunctions',
-    #                                 'analytic_continuation.pyx')]
-    #       ),
-    # Extension('abelfunctions.analytic_continuation_smale',
-    #           sources=[os.path.join('abelfunctions',
-    #                                 'analytic_continuation_smale.pyx')]
-    #       ),
-    # Extension('abelfunctions.polynomials',
-    #           sources=[os.path.join('abelfunctions','polynomials.pyx')]
-    #       ),
-    # Extension('abelfunctions.differentials',
-    #           sources=[os.path.join('abelfunctions','differentials.pyx')]
-    #       ),
-    Extension('abelfunctions.puiseux_series_ring_element',
-              sources=[os.path.join('abelfunctions','puiseux_series_ring_element.pyx')],
-              language='c++',
-              extra_compile_args=['-std=c99'],
-          ),
-    # Extension('abelfunctions.riemann_theta.radius',
-    #           sources=[os.path.join('abelfunctions','riemann_theta',
-    #                                 'lll_reduce.c'),
-    #                    os.path.join('abelfunctions','riemann_theta',
-    #                                 'radius.pyx')]
-    #       ),
-    # Extension('abelfunctions.riemann_theta.integer_points',
-    #           sources=[os.path.join('abelfunctions','riemann_theta',
-    #                                 'integer_points.pyx')]
-    #       ),
-    # Extension('abelfunctions.riemann_theta.riemann_theta',
-    #           sources=[os.path.join('abelfunctions','riemann_theta',
-    #                                 'finite_sum.c'),
-    #                    os.path.join('abelfunctions','riemann_theta',
-    #                                 'riemann_theta.pyx')]
-    #       ),
-    ]
-
-# parameters for all extension modules:
-#
-# * use all include directories in INCLUDES
-# * disable warnings in gcc step
-for mod in ext_modules:
-    mod.include_dirs.extend(INCLUDES)
-    mod.include_dirs.extend(INCLUDES_NUMPY)
-    mod.extra_compile_args.append('-w')
-
-tests = [
-    'abelfunctions.tests',
-#    'abelfunctions.riemanntheta.tests',
-    ]
-
 exec(open('abelfunctions/version.py').read())
 
 build_system.cythonize(ext_modules)
@@ -228,5 +229,5 @@ build_system.setup(
     license = 'GPL v2+',
     packages = ['abelfunctions'],
     ext_modules = ext_modules,
-    platforms = ['Linux', 'Unix', 'Mac OS-X'],
+    platforms = ['all'],
 )
