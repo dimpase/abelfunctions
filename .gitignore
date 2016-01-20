@@ -31,6 +31,8 @@ lattice_reduction.c
 lattice_reduction.html
 polynomials.c
 polynomials.html
+puiseux_series_ring_element.c
+puiseux_series_ring_element.html
 radius.c
 radius.html
 riemann_theta.c
