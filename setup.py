@@ -1,31 +1,31 @@
 #!/usr/bin/env python
-"""
-Distutils based setup script for abelfunctions
+"""Distutils based setup script for abelfunctions
 
-This uses Distutils (http://python.org/sigs/distutils-sig/) the standard
-python mechanism for installing packages. For the easiest installation
-just type the command (you'll probably need root privileges for that):
+This uses Distutils (http://python.org/sigs/distutils-sig/) the standard python
+mechanism for installing packages. For the easiest installation just type the
+command (you'll probably need root privileges for that):
 
-    python setup.py install
+    $ python setup.py install
 
 This will install the library in the default location. To install in a
 custom directory <dir>, use:
 
-    python setup.py install --prefix=<dir>
+    $ python setup.py install --prefix=<dir>
 
 To install for your user account (recommended) use:
 
-    python setup.py install --user
+    $ python setup.py install --user
+
+Finally, if you wish to build
 
 """
-import numpy
-
 import os
 import sys
 import shutil
 import unittest
-import build_system
-from distutils.core import Command
+from distutils.core import setup, Command
+from distutils.extension import Extension
+from Cython.Distutils import build_ext
 
 # include every conceivable directory that may contains sage headers
 SAGE_ROOT = os.environ['SAGE_ROOT']
@@ -39,40 +39,6 @@ INCLUDES = [os.path.join(SAGE_ROOT),
             os.path.join(SAGE_LOCAL,'include','python')]
 INCLUDES_NUMPY = [os.path.join(SAGE_LOCAL,'lib','python','site-packages',
                                'numpy','core','include')]
-
-# additional commands for building cython modules
-if '-ba' in sys.argv:
-    print "Rebuilding all Cython extensions."
-    sys.argv.remove('-ba')
-    FORCE = True
-else:
-    FORCE = False
-
-# custom define an extension to use the custom build system
-def Extension(*args, **kwds):
-    if not kwds.has_key('include_dirs'):
-        kwds['include_dirs'] = INCLUDES
-    else:
-        kwds['include_dirs'] += INCLUDES
-    if not kwds.has_key('force'):
-        kwds['force'] = FORCE
-
-    # Disable warnings when running GCC step -- cython has already parsed the code and
-    # generated any warnings; the GCC ones are noise.
-    if not kwds.has_key('extra_compile_args'):
-        kwds['extra_compile_args'] = ['-w']
-    else:
-        kwds['extra_compile_args'].append('-w')
-
-    E = build_system.Extension(*args, **kwds)
-#    E.libraries = ['csage'] + E.libraries
-    return E
-
-
-packages = [
-#    'abelfunctions.riemann_theta',
-#    'abelfunctions.utilities',
-    ]
 
 ext_modules = [
     # Extension('abelfunctions.riemann_surface',
@@ -123,12 +89,15 @@ ext_modules = [
 # * disable warnings in gcc step
 for mod in ext_modules:
     mod.include_dirs.extend(INCLUDES)
+    mod.include_dirs.extend(INCLUDES_NUMPY)
     mod.extra_compile_args.append('-w')
 
-tests = [
-    'abelfunctions.tests',
-#    'abelfunctions.riemanntheta.tests',
-    ]
+# package and sub-package list
+packages = [
+    'abelfunctions',
+    'abelfunctions.riemann_theta',
+    'abelfunctions.utilities'
+]
 
 class clean(Command):
     """Cleans files so you should get the same copy as in git."""
@@ -142,7 +111,6 @@ class clean(Command):
         pass
 
     def run(self):
-        print 'Cleaning abelfunctions...'
         # delete all files ending with certain extensions
         # currently: '.pyc', '~'
         dir_setup = os.path.dirname(os.path.realpath(__file__))
@@ -151,8 +119,10 @@ class clean(Command):
             for file in files:
                 file = os.path.join(root, file)
                 if file.endswith('.pyc') and os.path.isfile(file):
+                    print 'deleting %s...'%file
                     os.remove(file)
                 if file.endswith('~') and os.path.isfile(file):
+                    print 'deleting %s...'%file
                     os.remove(file)
 
         os.chdir(dir_setup)
@@ -161,8 +131,10 @@ class clean(Command):
         blacklist = ['build', 'dist', 'doc/_build']
         for file in blacklist:
             if os.path.isfile(file):
+                print 'deleting %s...'%file
                 os.remove(file)
             elif os.path.isdir(file):
+                print 'deleting %s...'%file
                 shutil.rmtree(file)
 
         os.chdir(dir_setup)
@@ -176,9 +148,11 @@ class clean(Command):
                 (root, ext) = os.path.splitext(file)
                 file_c = root + '.c'
                 if os.path.isfile(file_c):
+                    print 'deleting %s...'%file
                     os.remove(file_c)
                 file_cpp = root + '.cpp'
                 if os.path.isfile(file_cpp):
+                    print 'deleting %s...'%file
                     os.remove(file_cpp)
 
         os.chdir(dir_setup)
@@ -189,36 +163,14 @@ class clean(Command):
             file = mod.replace('.', os.path.sep) + '.so'
             file = os.path.join(dir_setup, file)
             if os.path.isfile(file):
+                print 'deleting %s...'%file
                 os.remove(file)
 
         os.chdir(curr_dir)
 
-
-class test_abelfunctions(Command):
-    """Runs all tests under every abelfunctions/ directory.
-
-    All Cython modules must be built in-place for testing to work.
-    """
-    description = "run all tests and doctests"
-    user_options = []
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        loader = unittest.TestLoader()
-        suite = loader.discover('abelfunctions')
-        result = unittest.TextTestRunner(verbosity=2).run(suite)
-        errno = not result.wasSuccessful()
-        sys.exit(errno)
-
+# configure setup
 exec(open('abelfunctions/version.py').read())
-
-build_system.cythonize(ext_modules)
-build_system.setup(
+setup(
     name = 'abelfunctions',
     version = __version__,
     description = 'A library for computing with Abelian functions, Riemann '
@@ -227,7 +179,8 @@ build_system.setup(
     author_email = 'cswiercz@gmail.com',
     url = 'https://github.com/cswiercz/abelfunctions',
     license = 'GPL v2+',
-    packages = ['abelfunctions'],
+    packages = packages,
     ext_modules = ext_modules,
     platforms = ['all'],
+    cmdclass = {'clean':clean, 'build_ext':build_ext},
 )
