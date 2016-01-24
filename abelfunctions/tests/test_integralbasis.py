@@ -23,10 +23,11 @@ class TestIntegralBasis(AbelfunctionsTestCase):
         b = [1, y/x, y**2/x**3]
         self.assertEqual(a,b)
 
-    # def test_f3(self):
-    #     a = integral_basis(self.f3,x,y)
-    #     b = [1, y, (y**2-1)/(x-1), -y*(x - 4*y**2 + 3)/(4*x*(x - 1))]
-    #     self.assertEqual(a,b)
+    def test_f3(self):
+        x,y = self.f3.parent().gens()
+        a = integral_basis(self.f3)
+        b = [1, y, (y**2-1)/(x-1), -y*(x - 4*y**2 + 3)/(x*(x - 1))]
+        self.assertEqual(a,b)
 
     def test_f4(self):
         x,y = self.f4.parent().gens()
@@ -34,10 +35,11 @@ class TestIntegralBasis(AbelfunctionsTestCase):
         b = [1, y/x]
         self.assertEqual(a,b)
 
-    # def test_f5(self):
-    #     a = integral_basis(self.f5,x,y)
-    #     b = [1, y, y**2, y**3, y*(y**3-1)/x, y**2*(y**3-1)/x**2]
-    #     self.assertEqual(a,b)
+    def test_f5(self):
+        x,y = self.f5.parent().gens()
+        a = integral_basis(self.f5)
+        b = [1, y, y**2, y**3, y*(y**3-1)/x, y**2*(y**3-1)/x**2]
+        self.assertEqual(a,b)
 
     def test_f6(self):
         x,y = self.f6.parent().gens()

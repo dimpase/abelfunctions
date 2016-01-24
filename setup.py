@@ -41,46 +41,31 @@ INCLUDES_NUMPY = [os.path.join(SAGE_LOCAL,'lib','python','site-packages',
                                'numpy','core','include')]
 
 ext_modules = [
-    # Extension('abelfunctions.riemann_surface',
-    #           sources=[os.path.join('abelfunctions','riemann_surface.pyx')]
-    #       ),
-    # Extension('abelfunctions.riemann_surface_path',
-    #           sources=[os.path.join('abelfunctions','riemann_surface_path.pyx')]
-    #       ),
-    # Extension('abelfunctions.analytic_continuation',
-    #           sources=[os.path.join('abelfunctions',
-    #                                 'analytic_continuation.pyx')]
-    #       ),
-    # Extension('abelfunctions.analytic_continuation_smale',
-    #           sources=[os.path.join('abelfunctions',
-    #                                 'analytic_continuation_smale.pyx')]
-    #       ),
-    # Extension('abelfunctions.polynomials',
-    #           sources=[os.path.join('abelfunctions','polynomials.pyx')]
-    #       ),
-    # Extension('abelfunctions.differentials',
-    #           sources=[os.path.join('abelfunctions','differentials.pyx')]
-    #       ),
     Extension('abelfunctions.puiseux_series_ring_element',
-              sources=[os.path.join('abelfunctions','puiseux_series_ring_element.pyx')],
-              extra_compile_args = ['-std=c99']
+              sources=[
+                  os.path.join('abelfunctions',
+                               'puiseux_series_ring_element.pyx')],
+              extra_compile_args = ['-std=c99'],
           ),
-    # Extension('abelfunctions.riemann_theta.radius',
-    #           sources=[os.path.join('abelfunctions','riemann_theta',
-    #                                 'lll_reduce.c'),
-    #                    os.path.join('abelfunctions','riemann_theta',
-    #                                 'radius.pyx')]
-    #       ),
-    # Extension('abelfunctions.riemann_theta.integer_points',
-    #           sources=[os.path.join('abelfunctions','riemann_theta',
-    #                                 'integer_points.pyx')]
-    #       ),
-    # Extension('abelfunctions.riemann_theta.riemann_theta',
-    #           sources=[os.path.join('abelfunctions','riemann_theta',
-    #                                 'finite_sum.c'),
-    #                    os.path.join('abelfunctions','riemann_theta',
-    #                                 'riemann_theta.pyx')]
-    #       ),
+    Extension('abelfunctions.riemann_theta.radius',
+              sources=[os.path.join('abelfunctions','riemann_theta',
+                                    'lll_reduce.c'),
+                       os.path.join('abelfunctions','riemann_theta',
+                                    'radius.pyx')],
+              extra_compile_args = ['-std=c99'],
+          ),
+    Extension('abelfunctions.riemann_theta.integer_points',
+              sources=[os.path.join('abelfunctions','riemann_theta',
+                                    'integer_points.pyx')],
+              extra_compile_args = ['-std=c99'],
+          ),
+    Extension('abelfunctions.riemann_theta.riemann_theta',
+              sources=[os.path.join('abelfunctions','riemann_theta',
+                                    'finite_sum.c'),
+                       os.path.join('abelfunctions','riemann_theta',
+                                    'riemann_theta.pyx')],
+              extra_compile_args = ['-std=c99'],
+          ),
     ]
 
 # parameters for all extension modules:

@@ -1,10 +1,14 @@
 r"""Integral Basis :mod:`abelfunctions.integralbasis`
 =================================================
 
-A module for computing integral bases of algebraic function fields of
-the form :math:`O(X) = \mathbb{C}[x,y] / (f(x,y))` where :math:`X :
-f(x,y) = 0`. The algorithm is based off of the paper "An Algorithm for
-Computing an Integral Basis in an Algebraic Function Field" by Mark van
+A module for computing integral bases of algebraic function fields of the form
+:math:`O(X) = \mathbb{C}[x,y] / (f(x,y))` where :math:`X : f(x,y) = 0`.
+
+For polynomials over :math:`\mathbb{Q}[x,y]` we use Singular's very fast
+implementation.
+
+The slow / general-purpose algorithm is based off of the paper "An Algorithm
+for Computing an Integral Basis in an Algebraic Function Field" by Mark van
 Hoeij [vHoeij]_.
 
 An integral basis for :math:`O(X)` is a set of :math:`\beta_i \in
@@ -12,12 +16,11 @@ An integral basis for :math:`O(X)` is a set of :math:`\beta_i \in
 
 .. math::
 
-    \overline{O(X)} = \beta_1\mathbb{C}[x,y] + \cdots +
-    \beta_g\mathbb{C}[x,y].
+    \overline{O(X)} = \beta_1\mathbb{C}[x,y] + \cdots + \beta_g\mathbb{C}[x,y].
 
-This data is necessary for computing a basis for the space of
-holomorphic differentials :math:`\Omega_X^1` defined on the Riemann
-surface :math:`X` which is implemented in ``differentials``.
+This data is necessary for computing a basis for the space of holomorphic
+differentials :math:`\Omega_X^1` defined on the Riemann surface :math:`X` which
+is implemented in ``differentials``.
 
 Functions
 ---------
@@ -29,16 +32,15 @@ Functions
 References
 ----------
 
-.. [vHoeij] Mark van Hoeij. "An Algorithm for Computing an Integral
-    Basis in an Algebraic Function Field". J. Symbolic
-    Computation. (1994) 18, p. 353-363
+.. [vHoeij] Mark van Hoeij. "An Algorithm for Computing an Integral Basis in an
+   Algebraic Function Field". J. Symbolic Computation. (1994) 18, p. 353-363
+
+.. [Singular] Wolfram Decker, Gert-Martin Greuel, Gerhard Pfister, and Hans
+   Schonemann. "Singular: library for computing the normalization of affine
+   rings". (2015).
 
 Examples
 --------
-
-We compute an integral basis of the curve :math:`f(x,y) = (x^2 - x +
-1)y^2 - 2x^2y + x^4`.
-
 
 Contents
 --------
@@ -54,6 +56,8 @@ from sage.matrix.constructor import Matrix, zero_matrix
 from sage.rings.polynomial.all import PolynomialRing
 from sage.rings.rational_field import QQ
 from sage.rings.qqbar import QQbar
+
+import warnings
 
 def Int(i, px):
     r"""Computes :math:`Int_i = \sum_{k \neq i} v(p_i-p_k)`.
@@ -197,19 +201,57 @@ def integral_basis(f):
     # monicize by applying the map `y -> y/lc(x), f -> lc^(d-1) f` where lc(x)
     # is the leading coefficient of f.
     d  = f.degree(y)
-    lc = R(f.polynomial(y).leading_coefficient())
+    lc = f.polynomial(y).leading_coefficient()
     if lc.degree() > 0:
-        fmonic = (f(x,y/lc)*lc**(d-1)).numerator()
+        # we have to carefully manage rings here. the path is:
+        #     R(x)[y] -> R[x][y] -> R[x,y]
+        fmonic = f(x,y/lc)*lc**(d-1) # element of R(x)[y]
+        B = R.base_ring()
+        fmonic = fmonic.change_ring(B[x])  # element of R[x][y]
+        fmonic = R(fmonic)  # element of R[x,y]
     else:
-        fmonic = (f/lc).numerator()
+        fmonic = f/R.base_ring()(lc)
         lc = 1
 
-    # compute the integral basis for the monicized curve
-    b = _integral_basis_monic(fmonic)
+    # if the curve lives in QQ[x,y] then use singular. otherwise, use slow
+    # self-implemented version
+    try:
+        fmonic = fmonic.change_ring(QQ)
+    except:
+        warnings.warn('using slower integral basis algorithm: '
+                      'cannot coerce curve %s to QQ[%s,%s]'%(fmonic,x,y))
+        b = _integral_basis_monic(fmonic)
+    else:
+        b = _integral_basis_monic_singular(fmonic)
 
     # reverse leading coefficient scaling
     for i in xrange(1,len(b)):
         b[i] = b[i](x,lc*y)
+    return b
+
+
+def _integral_basis_monic_singular(f):
+    r"""Computes an integral basis using singular.
+
+    Note that singular can only compute integral bases of algebraic function
+    fields over :math:`\mathbb{Q}[x,y]`. It will fail over other extensions.
+
+    Parameters
+    ----------
+    f : curve
+
+    Returns
+    -------
+    b : list
+        A list of integral basis elements.
+    """
+    from sage.all import singular
+    singular.load('integralbasis.lib')
+
+    l = singular.integralBasis(f,2)
+    ideal, denom = l.sage()
+    numerators = ideal.gens()
+    b = [numer/denom for numer in numerators]
     return b
 
 

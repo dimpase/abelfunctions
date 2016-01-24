@@ -149,14 +149,6 @@ cdef class PuiseuxSeries(AlgebraElement):
 
         """
         AlgebraElement.__init__(self, parent)
-#        self._parent = parent
-
-        # if is_PuiseuxSeries(f):
-        #     l = parent.laurent_series_ring()(f.laurent_part)
-        #     a = f.center
-        #     e = f.ramification_index
-        # else:
-        #     l = parent.laurent_series_ring()(f)
 
         if isinstance(f, PuiseuxSeries):
             if (<PuiseuxSeries>f).__l._parent is parent.laurent_series_ring():
@@ -169,13 +161,7 @@ cdef class PuiseuxSeries(AlgebraElement):
             l = parent.laurent_series_ring()(f)
 
         self.__l = l
-        self.__e = long(e)
-        # try:
-        #     self.__l = l
-        #     self.__e = long(e)
-        # except:
-        #     print l
-        #     print e
+        self.__e = long(abs(e))
 
     def __reduce__(self):
         return make_element_from_parent, (self.parent(), self.__l, self.__e)

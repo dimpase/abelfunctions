@@ -69,14 +69,15 @@ Contents
 --------
 """
 
-from .abelmap import AbelMap, Jacobian
-from .divisor import Place
-from .riemann_theta import RiemannTheta
-from .utilities import cached_function
+from abelfunctions.abelmap import AbelMap, Jacobian
+from abelfunctions.divisor import Place
+from abelfunctions.riemann_theta import RiemannTheta
 
 import numpy
 from numpy import dot
 from itertools import product
+
+from sage.all import cached_function
 
 def initialize_half_lattice_vectors(X):
     r"""Generate a list of all half-lattice vectors.
