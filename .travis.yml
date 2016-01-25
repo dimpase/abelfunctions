@@ -8,7 +8,6 @@ before_install:
 
 # build the code in-place
 install:
-  - cd abelfunctions
   - sage setup.py build_ext --inplace
 
 # run the tests
