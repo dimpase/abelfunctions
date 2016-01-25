@@ -1,16 +1,16 @@
-language: python
-sudo: true
+lanuage: python
 
 # download sage
-before-install:
-  sudo apt-add-repository -y ppa:aims/sagemath
-  sudo apt-get update -q
-  sudo apt-get install -y sagemath-upstream-binary
+before_install:
+  - sudo apt-add-repository -y ppa:aims/sagemath
+  - sudo apt-get update -q
+  - sudo apt-get install -y sagemath-upstream-binary
 
 # build the code in-place
 install:
-  cd abelfunctions && sage setup.py build_ext --inplace
+  - cd abelfunctions
+  - sage setup.py build_ext --inplace
 
 # run the tests
 script:
-  sage runtests.py -v
+  - sage runtests.py -v
