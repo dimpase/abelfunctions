@@ -9,8 +9,11 @@ before-install:
 
 # build the code in-place
 install:
+  pwd
+  cd abelfunctions
   sage setup.py build_ext --inplace
 
 # run the tests
 script:
+  pwd
   sage runtests.py -v
