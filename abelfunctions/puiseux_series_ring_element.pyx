@@ -338,7 +338,7 @@ cdef class PuiseuxSeries(AlgebraElement):
         return g, m, n
 
     cpdef ModuleElement _add_(self, ModuleElement right_m):
-        cdef PuiseuxSeries right = <PuiseuxSeries>right_m;
+        cdef PuiseuxSeries right = <PuiseuxSeries>right_m
         cdef LaurentSeries l, l1, l2
         cdef long g, m, n
 
@@ -349,7 +349,7 @@ cdef class PuiseuxSeries(AlgebraElement):
         return PuiseuxSeries(self._parent, l, g)
 
     cpdef ModuleElement _sub_(self, ModuleElement right_m):
-        cdef PuiseuxSeries right = <PuiseuxSeries>right_m;
+        cdef PuiseuxSeries right = <PuiseuxSeries>right_m
         cdef LaurentSeries l, l1, l2
         cdef long g, m, n
 
@@ -360,7 +360,7 @@ cdef class PuiseuxSeries(AlgebraElement):
         return PuiseuxSeries(self._parent, l, g)
 
     cpdef RingElement _mul_(self, RingElement right_r):
-        cdef PuiseuxSeries right = <PuiseuxSeries>right_r;
+        cdef PuiseuxSeries right = <PuiseuxSeries>right_r
         cdef LaurentSeries l, l1, l2
         cdef long g, m, n
 
@@ -377,7 +377,7 @@ cdef class PuiseuxSeries(AlgebraElement):
         return PuiseuxSeries(self._parent, self.__l._lmul_(c), self.__e)
 
     cpdef RingElement _div_(self, RingElement right_r):
-        cdef PuiseuxSeries right = <PuiseuxSeries>right_r;
+        cdef PuiseuxSeries right = <PuiseuxSeries>right_r
         cdef LaurentSeries l, l1, l2
         cdef long g, m, n
 
