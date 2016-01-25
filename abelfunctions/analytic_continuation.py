@@ -236,7 +236,7 @@ class AnalyticContinuatorPuiseux(AnalyticContinuator):
             return yi
 
         # simply evaluate the ordered puiseux series at xip1
-        alpha = 0 if self.center == infinity else self.center
+        alpha = CC(0) if self.center == infinity else CC(self.center)
         yip1 = numpy.array([pj(xip1-alpha) for pj in self.puiseux_series],
                            dtype=numpy.complex)
         return yip1

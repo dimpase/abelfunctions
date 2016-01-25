@@ -797,7 +797,7 @@ class PuiseuxTSeries(object):
             t = self.ypart.parent().gen()
             fconj = self.ypart(c*t)
             p = P(fconj(x**(QQ(1)/e)))
-            p = p.add_bigoh(QQ(order+1)/e)
+            p = p.add_bigoh(QQ(order+1)/abs(e))
             xseries.append(p)
         return xseries
 

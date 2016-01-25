@@ -40,7 +40,7 @@ from abelfunctions.utilities import (
 from abelfunctions.xpath_factory import XPathFactory, XPathFactoryAbel
 from abelfunctions.ypath_factory import YPathFactory
 
-from sage.all import infinity
+from sage.all import infinity, CC
 
 class RiemannSurfacePathFactory(object):
     r"""Factory class for constructing paths on the Riemann surface.
@@ -207,7 +207,8 @@ class RiemannSurfacePathFactory(object):
         # place at infinity
         p = P.puiseux_series
         center, coefficient, ramification_index = p.xdata
-        ta = (xa/coefficient)**(1.0/ramification_index)
+        ta = CC(xa/coefficient).nth_root(abs(ramification_index))
+        ta = ta if ramification_index > 0 else 1/ta
         p.extend_to_t(ta)
         ya = numpy.complex(p.eval_y(ta))
 

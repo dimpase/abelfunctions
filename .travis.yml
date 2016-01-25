@@ -13,4 +13,4 @@ install:
 
 # run the tests
 script:
-  sage runtests.py
+  sage runtests.py -v
