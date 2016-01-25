@@ -1,7 +1,8 @@
 import unittest
+from .test_abelfunctions import AbelfunctionsTestCase
 
 from abelfunctions.puiseux_series_ring import PuiseuxSeriesRing
-from .test_abelfunctions import AbelfunctionsTestCase
+from abelfunctions.puiseux_series_ring_element import LaurentSeries_V
 
 from sage.all import SR, CC
 from sage.rings.laurent_series_ring import LaurentSeriesRing
@@ -64,6 +65,26 @@ class TestPuiseuxSeries(unittest.TestCase):
         p = 1 + 42*x**(QQ(1)/2) + 99*x**(QQ(1)/3)
         self.assertEqual(p.laurent_part, 1 + 99*y**2 + 42*y**3)
         self.assertEqual(p.ramification_index, 6)
+
+    def test_LaurentSeries_V(self):
+        L = LaurentSeriesRing(QQ,'t')
+        t = L.gen()
+
+        l = 1*t**(-3) + 2 + 3*t**1 + 4*t**2 + 5*t**9
+        m = LaurentSeries_V(l,1)
+        self.assertEqual(l, m)
+
+        m = LaurentSeries_V(l, 2)
+        self.assertEqual(m.exponents(), [-6,0,2,4,18])
+        self.assertEqual(m.coefficients(), [1,2,3,4,5])
+
+        m = LaurentSeries_V(l, -1)
+        self.assertEqual(m.exponents(), [-9,-2,-1,0,3])
+        self.assertEqual(m.coefficients(), [5,4,3,2,1])
+
+        m = LaurentSeries_V(l, -3)
+        self.assertEqual(m.exponents(), [-27,-6,-3,0,9])
+        self.assertEqual(m.coefficients(), [5,4,3,2,1])
 
     def test_repr(self):
         R = PuiseuxSeriesRing(QQ, 't')
@@ -168,6 +189,21 @@ class TestPuiseuxSeries(unittest.TestCase):
         U = PuiseuxSeriesRing(B, 'x')
         s = p.change_ring(B)
         self.assertEqual(s.parent(), U)
+
+    def test_bigoh(self):
+        R = PuiseuxSeriesRing(QQ, 'x')
+        x = R.gen()
+        half = QQ(1)/QQ(2)
+
+        p = x**(3*half)
+        q = p.add_bigoh(half)
+        self.assertEqual(q.prec(), half)
+        self.assertEqual(q.laurent_part.prec(), 1)
+
+        p = x**(3*half)
+        q = p.add_bigoh(4)
+        self.assertEqual(q.prec(), 4)
+        self.assertEqual(q.laurent_part.prec(), 8)
 
 
     # def test_div(self):

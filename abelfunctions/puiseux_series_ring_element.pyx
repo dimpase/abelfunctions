@@ -100,12 +100,14 @@ Contents
 
 """
 
-from sage.all import gcd, fast_callable
+from sage.all import gcd, fast_callable, O
 from sage.rings.infinity import infinity
 from sage.rings.laurent_series_ring_element import is_LaurentSeries
 from sage.rings.laurent_series_ring_element cimport LaurentSeries
+from sage.rings.power_series_ring_element cimport PowerSeries
 from sage.rings.rational_field import QQ
-from sage.structure.element cimport Element, ModuleElement, RingElement, AlgebraElement
+from sage.structure.element cimport (
+    Element, ModuleElement, RingElement, AlgebraElement)
 
 
 def is_PuiseuxSeries(x):
@@ -113,6 +115,58 @@ def is_PuiseuxSeries(x):
 
 def make_element_from_parent(parent, *args):
     return parent(*args)
+
+cpdef LaurentSeries LaurentSeries_V(LaurentSeries f, long n):
+    """
+    If `f = \sum a_m x^m` then this function returns `\sum a_m x^{mn}`.
+
+    This should eventually be implemented within Sage itself.
+
+    EXAMPLES::
+
+        sage: R.<x> = LaurentSeriesRing(QQ)
+        sage: f = -1/x + 1 + 2*x^2 + 5*x^5
+        sage: f.V(2)
+        -x^-2 + 1 + 2*x^4 + 5*x^10
+        sage: f.V(-1)
+        5*x^-5 + 2*x^-2 + 1 - x
+
+    TESTS::
+
+        sage: R.<x> = LaurentSeriesRing(QQ)
+        sage: f = x
+        sage: f.V(3)
+        x^3
+        sage: f.V(-3)
+        x^-3
+        sage: g = 2*x^(-1) + 3 + 5*x
+        sage: g.V(-1)
+        5*x^-1 + 3 + 2*x
+    """
+    cdef LaurentSeries l
+    cdef PowerSeries __u
+    cdef long __n
+
+    if n == 0:
+        raise NotImplementedError()
+    if n < 0:
+        exponents = [e*n for e in f.exponents()]
+        u = min(exponents)
+        exponents = [e-u for e in exponents]
+        coefficients = f.coefficients()
+        zero = f.base_ring()(0)
+        w = [zero]*(max(exponents)+1)
+        for i in range(len(exponents)):
+            e = exponents[i]
+            c = coefficients[i]
+            w[e] = c
+        l = LaurentSeries(f._parent, w, u)
+    else:
+        __u = f.__u.V(n)
+        __n = <long>f.__n*n
+        l = LaurentSeries(f._parent, __u, __n)
+    return l
+
 
 cdef class PuiseuxSeries(AlgebraElement):
     r"""
@@ -285,8 +339,8 @@ cdef class PuiseuxSeries(AlgebraElement):
         cdef long g, m, n
 
         g, m, n = self._common_ramification_index(right)
-        l1 = self.__l.V(m)
-        l2 = right.__l.V(n)
+        l1 = LaurentSeries_V(self.__l, m)
+        l2 = LaurentSeries_V(right.__l, n)
         l = l1 + l2
         return PuiseuxSeries(self._parent, l, g)
 
@@ -296,8 +350,8 @@ cdef class PuiseuxSeries(AlgebraElement):
         cdef long g, m, n
 
         g, m, n = self._common_ramification_index(right)
-        l1 = self.__l.V(m)
-        l2 = right.__l.V(n)
+        l1 = LaurentSeries_V(self.__l, m)
+        l2 = LaurentSeries_V(right.__l, n)
         l = l1 - l2
         return PuiseuxSeries(self._parent, l, g)
 
@@ -307,8 +361,8 @@ cdef class PuiseuxSeries(AlgebraElement):
         cdef long g, m, n
 
         g, m, n = self._common_ramification_index(right)
-        l1 = self.__l.V(m)
-        l2 = right.__l.V(n)
+        l1 = LaurentSeries_V(self.__l, m)
+        l2 = LaurentSeries_V(right.__l, n)
         l = l1 * l2
         return PuiseuxSeries(self._parent, l, g)
 
@@ -324,8 +378,8 @@ cdef class PuiseuxSeries(AlgebraElement):
         cdef long g, m, n
 
         g, m, n = self._common_ramification_index(right)
-        l1 = self.__l.V(m)
-        l2 = right.__l.V(n)
+        l1 = LaurentSeries_V(self.__l, m)
+        l2 = LaurentSeries_V(right.__l, n)
         l = l1 / l2
         return PuiseuxSeries(self._parent, l, g)
 
@@ -349,7 +403,7 @@ cdef class PuiseuxSeries(AlgebraElement):
         else:
             if not self.is_monomial():
                 raise ValueError('Can only exponentiate single term by rational')
-            l = self.__l.V(numer)
+            l = LaurentSeries_V(self.__l, numer)
             e = self.__e * int(denom)
         return PuiseuxSeries(self._parent, l, e)
 
@@ -433,7 +487,18 @@ cdef class PuiseuxSeries(AlgebraElement):
     def add_bigoh(self, prec):
         if prec == infinity or prec >= self.prec():
             return self
-        l = self.__l.add_bigoh(prec*self.__e)
+
+        # the following is here due to a bug in Sage: adding a bigoh of order
+        # less than the series precision raises an error due to attempting to
+        # build an underlying power series with negative precision. this fix
+        # makes sure that if the requested precision is less than that if the
+        # Laurent series it will just return a bigoh
+        l_prec = int(prec*self.__e)
+        if l_prec <= self.__l.prec():
+            x = self.__l.parent().gen()
+            l = O(x**l_prec)
+        else:
+            l = self.__l.add_bigoh(l_prec)
         return PuiseuxSeries(self.parent(), l, self.__e)
 
     def change_ring(self, R):
