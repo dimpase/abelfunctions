@@ -4,12 +4,11 @@ lanuage: python
 before_install:
   - curl -O http://files.sagemath.org/linux/64bit/sage-6.10-Ubuntu_15.04-x86_64.tar.bz2
   - tar xfj sage-6.10-Ubuntu_15.04-x86_64.tar.bz2
-  - sudo ln -s SageMath/sage /usr/local/bin/sage
 
 # build the code in-place
 install:
-  - sage setup.py build_ext --inplace
+  - SageMath/sage setup.py build_ext --inplace
 
 # run the tests
 script:
-  - sage runtests.py -v
+  - SageMath/sage runtests.py -v
