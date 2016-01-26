@@ -2,9 +2,9 @@ lanuage: python
 
 # download sage
 before_install:
-  - sudo apt-add-repository -y ppa:aims/sagemath
-  - sudo apt-get update -q
-  - sudo apt-get install -y sagemath-upstream-binary
+  - curl -O http://files.sagemath.org/linux/64bit/sage-6.10-Ubuntu_15.04-x86_64.tar.bz2
+  - tar xvfj sage-6.10-Ubuntu_15.04-x86_64.tar.bz2
+  - sudo ln -s sage-6.10-Ubuntu_15.04-x86_64/sage /usr/local/bin/sage
 
 # build the code in-place
 install:
