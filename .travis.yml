@@ -4,6 +4,7 @@ lanuage: python
 before_install:
   - curl -O http://files.sagemath.org/linux/64bit/sage-6.10-Ubuntu_15.04-x86_64.tar.bz2
   - tar xfj sage-6.10-Ubuntu_15.04-x86_64.tar.bz2
+  - SageMath/sage -c "import os; printos.getcwd()"
 
 # build the code in-place
 install:
