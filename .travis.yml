@@ -1,15 +1,13 @@
-lanuage: python
-
-# download sage
+# download sage and run it once
 before_install:
   - curl -O http://files.sagemath.org/linux/64bit/sage-6.10-Ubuntu_15.04-x86_64.tar.bz2
   - tar xfj sage-6.10-Ubuntu_15.04-x86_64.tar.bz2
-  - SageMath/sage -c "import os; printos.getcwd()"
+  -  cd ./SageMath && ./sage -c && cd ..
 
 # build the code in-place
 install:
-  - SageMath/sage setup.py build_ext --inplace
+  - ./SageMath/sage setup.py build_ext --inplace
 
 # run the tests
 script:
-  - SageMath/sage runtests.py -v
+  - ./SageMath/sage runtests.py -v
