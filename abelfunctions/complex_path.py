@@ -73,6 +73,15 @@ class ComplexPathPrimitive(object):
     def __call__(self, s):
         return self.eval(s)
 
+    def eval(self, s):
+        raise NotImplementedError('Implement in subclass.')
+
+    def derivative(self, s):
+        raise NotImplementedError('Implement in subclass.')
+
+    def reverse(self):
+        raise NotImplementedError('Implement in subclass.')
+
     def plot(self, plot_points=128, **kwds):
         r"""Return a plot of the path.
 
@@ -129,8 +138,17 @@ class ComplexPath(ComplexPathPrimitive):
         *args : list
             A list of :class:`ComplexPathPrimitive`s.
         """
+        # assert that the segments form a continuous path
+        n = len(args)
+        eps = 1e-14
+        for k in range(n-1):
+            gamma0 = args[0]
+            gamma1 = args[1]
+            if abs(gamma1(0.0) - gamma0(1.0)) > eps:
+                raise ValueError('Segments must form continuous path.')
+
         self._segments = list(args)
-        self._nsegments = len(args) # cached for performance
+        self._nsegments = n
 
     def __getitem__(self, index):
         r"""Return the segment at index `index`"""
@@ -181,6 +199,41 @@ class ComplexPath(ComplexPathPrimitive):
         val = seg.eval(s_seg)
         return val
 
+    def derivative(self, s):
+        r"""Return the derivative of the complex path with respect to the
+        parameter.
+
+        Parameters
+        ----------
+        s : float
+            Path parameter in the interval [0,1].
+
+        Returns
+        -------
+        index : int
+            The index `k` of the path segment :math:`\gamma_k`.
+        """
+        k = self.segment_index_at_parameter(s)
+        s_seg = s*self._nsegments - k
+        seg = self._segments[k]
+        val = seg.derivative(s_seg)
+        return val
+
+    def reverse(self):
+        r"""Return the path reversed.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        gamma : ComplexPath
+        """
+        reversed_segments = [segment.reverse() for segment in self[::-1]]
+        gamma = ComplexPath(*reversed_segments)
+        return gamma
+
     def plot(self, plot_points=128, **kwds):
         r"""Return a plot of the path.
 
@@ -208,27 +261,6 @@ class ComplexPath(ComplexPathPrimitive):
         plt = sum(seg.plot(s_seg, **kwds) for seg in self._segments)
         return plt
 
-    def derivative(self, s):
-        r"""Return the derivative of the complex path with respect to the
-        parameter.
-
-        Parameters
-        ----------
-        s : float
-            Path parameter in the interval [0,1].
-
-        Returns
-        -------
-        index : int
-            The index `k` of the path segment :math:`\gamma_k`.
-        """
-        k = self.segment_index_at_parameter(s)
-        s_seg = s*self._nsegments - k
-        seg = self._segments[k]
-        val = seg.derivative(s_seg)
-        return val
-
-
 class ComplexLine(ComplexPathPrimitive):
     r"""A line segment in the complex plane.
 
@@ -247,6 +279,13 @@ class ComplexLine(ComplexPathPrimitive):
         s = 'Line(%s,%s)'%(self.x0, self.x1)
         return s
 
+    def __eq__(self, other):
+        if not isinstance(other, ComplexLine):
+            return False
+        if (self.x0 == other.x0) and (self.x1 == other.x1):
+            return True
+        return False
+
     def eval(self, s):
         val = self.x0 + (self.x1-self.x0)*s
         return val
@@ -254,6 +293,9 @@ class ComplexLine(ComplexPathPrimitive):
     def derivative(self, s):
         val = self.x1 - self.x0
         return val
+
+    def reverse(self):
+        return ComplexLine(self.x1, self.x0)
 
 
 class ComplexArc(ComplexPathPrimitive):
@@ -282,6 +324,14 @@ class ComplexArc(ComplexPathPrimitive):
         s = 'Arc(%s,%s,%s,%s)'%(self.R, self.w, self.theta, self.dtheta)
         return s
 
+    def __eq__(self, other):
+        if not isinstance(other, ComplexArc):
+            return False
+        if ((self.R == other.R) and (self.w == other.w) and
+            (self.theta == other.theta) and (self.dtheta == other.dtheta)):
+            return True
+        return False
+
     def eval(self, s):
         val = self.R*numpy.exp(1.0j*(self.theta + s*self.dtheta)) + self.w
         return val
@@ -290,6 +340,9 @@ class ComplexArc(ComplexPathPrimitive):
         val = (self.R*1.0j*self.dtheta) * \
               numpy.exp(1.0j*(self.theta + s*self.dtheta))
         return val
+
+    def reverse(self):
+        return ComplexArc(self.R, self.w, self.theta+self.dtheta, -self.dtheta)
 
 
 class ComplexRay(ComplexPathPrimitive):
@@ -309,6 +362,13 @@ class ComplexRay(ComplexPathPrimitive):
         s = 'Arc(%s)'%self.x0
         return s
 
+    def __eq__(self, other):
+        if not isinstance(other, ComplexRay):
+            return False
+        if self.x0 != other.x0:
+            return False
+        return True
+
     def eval(self, s):
         if s == 1.0: return Infinity
         val = self.x0/(1.-s)
@@ -318,3 +378,6 @@ class ComplexRay(ComplexPathPrimitive):
         if s == 1.0: return Infinity
         val = -self.x0/(1.-s)**2
         return val
+
+    def reverse(self):
+        raise ValueError('Cannot reverse paths to infinity.')
