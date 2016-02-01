@@ -7,11 +7,11 @@ Classes
 
 .. autosummary::
 
-    ComplexPathPrimitive
-    ComplexPath
-    ComplexPathLine
-    ComplexPathArc
-    ComplexPathRay
+  ComplexPathPrimitive
+  ComplexPath
+  ComplexPathLine
+  ComplexPathArc
+  ComplexPathRay
 
 Contents
 --------
@@ -126,7 +126,8 @@ class ComplexPath(ComplexPathPrimitive):
 
         Parameters
         ----------
-        RiemannSurface : A
+        *args : list
+            A list of :class:`ComplexPathPrimitive`s.
         """
         self._segments = list(args)
         self._nsegments = len(args) # cached for performance

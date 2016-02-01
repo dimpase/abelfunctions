@@ -1,6 +1,6 @@
 import unittest
 
-from numpy import pi, Infinity, sin, cos, exp
+from numpy import pi, Infinity, exp
 from abelfunctions.complex_path import (
     ComplexPathPrimitive,
     ComplexPath,
@@ -8,7 +8,6 @@ from abelfunctions.complex_path import (
     ComplexArc,
     ComplexRay,
 )
-
 
 class TestConstruction(unittest.TestCase):
     def test_line(self):
@@ -130,6 +129,3 @@ class TestEvaluationDerivative(unittest.TestCase):
         self.assertAlmostEqual(gamma.derivative(0.51), 1.j)
         self.assertAlmostEqual(gamma.derivative(0.75), 1.j)
         self.assertAlmostEqual(gamma.derivative(1), 1.j)
-
-
-
