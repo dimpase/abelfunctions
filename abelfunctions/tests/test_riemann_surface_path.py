@@ -33,7 +33,6 @@ class TestOrderedPuiseuxSeries(unittest.TestCase):
         f2 = y**3 - x
         self.f2 = f2
         self.X2 = RiemannSurface(f2)
-
     def test_example_puiseux(self):
         p = puiseux(self.f1, 0)[0]
         px = p.xseries()
@@ -243,8 +242,6 @@ class TestRiemannSurfacePathPuiseux(unittest.TestCase):
         y = gamma.get_y(1)
         self.assertTrue(numpy.isnan(y[0]))
         self.assertTrue(numpy.isnan(y[1]))
-
-
 
 class TestRiemannSurfacePathSmale(unittest.TestCase):
     def setUp(self):

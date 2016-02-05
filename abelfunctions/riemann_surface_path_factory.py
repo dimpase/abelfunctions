@@ -26,12 +26,14 @@ import numpy
 import scipy
 import scipy.linalg as linalg
 
+from abelfunctions.complex_path import(
+    ComplexLine,
+    ComplexArc,
+    ComplexRay,
+)
 from abelfunctions.riemann_surface_path import (
-    RiemannSurfacePathPrimitive,
-    RiemannSurfacePath,
-    RiemannSurfacePathArc,
-    RiemannSurfacePathLine,
-    RiemannSurfacePathRay,
+    RiemannSurfacePathPuiseux,
+    RiemannSurfacePathSmale,
     )
 from abelfunctions.utilities import (
     Permutation,
@@ -64,23 +66,26 @@ class RiemannSurfacePathFactory(object):
 
     Methods
     -------
-    base_point
-    base_sheets
-    base_place
-    discriminant_points
-    closest_discriminant_point
-    branch_points
-    path_to_place
-    monodromy_group
-    monodromy_path
-    a_cycles
-    b_cycles
-    c_cycles
-    show_paths
-    RiemannSurfacePath_from_cycle
-    RiemannSurfacePath_from_xpath
-    _path_to_discriminant_place
-    _path_to_regular_place
+    .. autosummary::
+
+      base_point
+      base_sheets
+      base_place
+      discriminant_points
+      closest_discriminant_point
+      branch_points
+      path_to_place
+      monodromy_group
+      monodromy_path
+      a_cycles
+      b_cycles
+      c_cycles
+      show_paths
+      RiemannSurfacePath_from_cycle
+      RiemannSurfacePath_from_xpath
+      _path_to_discriminant_place
+      _path_to_regular_place
+
     """
     def __init__(self, RS, kappa=2./5.):
         r"""Initialize the Riemann surface path factory.
