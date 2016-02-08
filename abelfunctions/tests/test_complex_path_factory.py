@@ -1,7 +1,7 @@
 import unittest
 
 import numpy
-from numpy import pi, Infinity, exp, sqrt
+from numpy import pi, Infinity, exp, sqrt, complex
 from abelfunctions.complex_path import (
     ComplexPathPrimitive,
     ComplexPath,
@@ -11,7 +11,7 @@ from abelfunctions.complex_path import (
 )
 from abelfunctions.complex_path_factory import ComplexPathFactory
 from abelfunctions.riemann_surface import RiemannSurface
-from sage.all import QQ
+from sage.all import QQ, QQbar, I
 
 class TestConstruction(unittest.TestCase):
     def setUp(self):
@@ -32,18 +32,18 @@ class TestConstruction(unittest.TestCase):
         f = self.f1
         CPF = ComplexPathFactory(f, -1)
         discriminant_points = CPF.discriminant_points
-        self.assertItemsEqual(discriminant_points, [0])
+        self.assertItemsEqual(discriminant_points, [QQbar(0)])
 
         f = self.f2
         CPF = ComplexPathFactory(f, -2)
         discriminant_points = CPF.discriminant_points
-        self.assertItemsEqual(discriminant_points, [-1.j, 1.j])
+        self.assertItemsEqual(discriminant_points, map(QQbar, [-I, I]))
 
         f = self.f3
         CPF = ComplexPathFactory(f, -2)
         discriminant_points = CPF.discriminant_points
         self.assertItemsEqual(discriminant_points,
-                              [-1.j, -1, 1, 1.j])
+                              map(QQbar,[-I, -1, 1, I]))
 
     def test_base_point(self):
         f = self.f1
@@ -162,15 +162,15 @@ class TestConstruction(unittest.TestCase):
         path_points = path(s)
         centered_path_points = path_points - CPF.base_point
 
-        centered_b0 = CPF.discriminant_points[0] - CPF.base_point
+        centered_b0 = complex(CPF.discriminant_points[0] - CPF.base_point)
         b0_angles = numpy.angle(centered_path_points - centered_b0)
         self.assertTrue(all(b0_angles[1:] >= 0))
 
-        centered_b1 = CPF.discriminant_points[1] - CPF.base_point
+        centered_b1 = complex(CPF.discriminant_points[1] - CPF.base_point)
         b1_angles = numpy.angle(centered_path_points - centered_b1)
         self.assertTrue(all(b1_angles[1:] >= 0))
 
-        centered_b2 = CPF.discriminant_points[2] - CPF.base_point
+        centered_b2 = complex(CPF.discriminant_points[2] - CPF.base_point)
         b2_angles = numpy.angle(centered_path_points - centered_b2)
         self.assertTrue(all(b2_angles[1:] >= 0))
 
@@ -187,7 +187,7 @@ class TestConstruction(unittest.TestCase):
         b2_angles = numpy.angle(centered_path_points - centered_b2)
         self.assertTrue(all(b2_angles[1:] <= 0))
 
-        centered_b3 = CPF.discriminant_points[3] - CPF.base_point
+        centered_b3 = complex(CPF.discriminant_points[3] - CPF.base_point)
         b3_angles = numpy.angle(centered_path_points - centered_b3)
         self.assertTrue(all(b3_angles[1:] <= 0))
 
@@ -248,3 +248,11 @@ class TestConstruction(unittest.TestCase):
 
         b = CPF.closest_discriminant_point(-2 + 2.1j)
         self.assertEqual(b, discriminant_points[3])
+
+    def test_complex_path_around_infinity(self):
+        f = self.f3
+        CPF = ComplexPathFactory(f, -3, kappa=0.5)
+        gamma = CPF.complex_path_around_infinity()
+        self.assertAlmostEqual(gamma(0), CPF.base_point)
+        self.assertAlmostEqual(gamma(1.0), CPF.base_point)
+

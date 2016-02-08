@@ -141,9 +141,9 @@ class ComplexPathFactory(object):
             base_point = aint
 
         # sort the discriminant points first by argument with the base point
-        # and then by distance from the base point.
-        discriminant_points = numpy.array(discriminant_points, dtype=complex)
-        centered_points = discriminant_points - base_point
+        # and then by distance from the base point. the points need to be exact
+        discriminant_points = numpy.array(discriminant_points)
+        centered_points = numpy.array(discriminant_points - base_point, dtype=complex)
         distances = abs(centered_points)
         arguments = angle(centered_points)
         sort_index = numpy.lexsort((distances, arguments))
@@ -174,10 +174,10 @@ class ComplexPathFactory(object):
         # for performance, coerce everything to floating point approximations.
         # if the discriminant points are less than 1e-16 apart then we're
         # screwed, anyway.
-        b = numpy.array(self.discriminant_points)
+        b = numpy.array(self.discriminant_points, dtype=complex)
         x = complex(x)
         idx = numpy.argmin(abs(b - x))
-        return b[idx]
+        return self.discriminant_points[idx]
 
     def _compute_radii(self, kappa):
         """Returns the radii of the bounding circles.
@@ -318,7 +318,7 @@ class ComplexPathFactory(object):
         """
         Ri = self.radius(bi)
         z = self.complex_path_to_discriminant_point(bi)(1.0)
-        theta = numpy.angle(z - bi)
+        theta = numpy.angle(complex(z - bi))
         dtheta = numpy.pi if nrots > 0 else -numpy.pi
         circle = ComplexArc(Ri, bi, theta, dtheta) + \
                  ComplexArc(Ri, bi, theta + dtheta, dtheta)
@@ -331,7 +331,7 @@ class ComplexPathFactory(object):
 
     def complex_path_to_point(self, x):
         """Returns a complex path from the base point to `x`.
- 
+
         Parameters
         ----------
         x : complex
@@ -460,8 +460,8 @@ class ComplexPathFactory(object):
             Ri = numpy.abs(bi) + 2*radius  # to be safely away
             R = Ri if Ri > R else R
 
-        # the path begins with a line starting the base point and ending
-        # at -R.
+        # the path begins with a line starting at the base point and ending at
+        # the point -R (where the circle will begin)
         path = ComplexLine(self.base_point, -R)
 
         # the positive direction around infinity is equal to the
@@ -473,6 +473,13 @@ class ComplexPathFactory(object):
 
         # return to the base point
         path += ComplexLine(-R, self.base_point)
+
+        # determine if the circle actually touches the base point. this occurs
+        # when the base point is further away from the origin than the bounding
+        # circles of discriminant points. in this case, the path only consists
+        # of the arcs defining the circle
+        if abs(self.base_point + R) < 1e-15:
+            path = ComplexPath(*path.segments[1:-1])
         return path
 
     def complex_path_to_point(self, x):
@@ -499,11 +506,11 @@ class ComplexPathFactory(object):
         None
         """
         # fill the bounding circles around each discriminant point
-        a = self.base_point
-        b = self.discriminant_points
+        a = complex(self.base_point)
+        b = numpy.array(self.discriminant_points, dtype=complex)
 
         # plot the base point and the discriminant points
-        pts = [(real_part(a), imag_part(a))]
+        pts = [(a.real, a.imag)]
         plt = scatter_plot(pts, facecolor='red', **kwds)
         pts = zip(b.real, b.imag)
         plt += scatter_plot(pts, facecolor='black', **kwds)

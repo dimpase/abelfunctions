@@ -19,7 +19,7 @@ Contents
 
 import numpy
 
-from numpy import Infinity
+from numpy import Infinity, complex
 from sage.functions.other import real_part, imag_part, floor
 from sage.plot.line import line
 

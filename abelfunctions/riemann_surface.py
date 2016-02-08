@@ -20,6 +20,7 @@ from abelfunctions.riemann_surface_path_factory import RiemannSurfacePathFactory
 from abelfunctions.singularities import genus
 
 from sage.all import QQbar, infinity
+from sage.misc.cachefunc import cached_function, cached_method
 
 
 class RiemannSurface(object):
@@ -34,19 +35,38 @@ class RiemannSurface(object):
 
     @property
     def deg(self):
-        return self._deg
+        # legacy
+        return self._degree
 
     @property
     def degree(self):
-        return self._deg
+        return self._degree
+
+    @property
+    def base_point(self):
+        return self.path_factory.base_point
+
+    @property
+    def base_sheets(self):
+        return self.path_factory.base_sheets
+
+    @property
+    def base_place(self):
+        alpha = self.base_point
+        beta = self.base_sheets[0]
+        return RegularPlace(self, alpha, beta)
 
     @property
     def path_factory(self):
         if not self._path_factory:
-            self._path_factory = PathFactory(self)
+            self._path_factory = RiemannSurfacePathFactory(
+                self, base_point=self._base_point,
+                base_sheets=self._base_sheets, kappa=self._kappa)
+            self._base_point = self._path_factory.base_point
+            self._base_sheets = self._path_factory.base_sheets
         return self._path_factory
 
-    def __init__(self, f, base_point=None, base_sheets=None, kappa=2./5):
+    def __init__(self, f, base_point=None, base_sheets=None, kappa=3./5):
         """Construct a Riemann surface.
 
         Parameters
@@ -54,7 +74,7 @@ class RiemannSurface(object):
         f : curve
             The algebraic curve representing the Riemann surface.
         base_point : complex, optional
-            A custom base point for the Monodromy group.
+            A custom base point for the monodromy group.
         base_sheets : complex list, optional
             A custom ordering of the sheets at the base point.
         kappa : double
@@ -65,28 +85,12 @@ class RiemannSurface(object):
         R = f.parent()
         x,y = R.gens()
         self._f = f
-        self._deg = f.degree(y)
-
-        # set custom base point, if provided. otherwise, base_point is set by
-        # self.discriminant_points()
+        self._degree = f.degree(y)
         self._base_point = base_point
-        self._base_sheets = None
-        self._discriminant_points = None
-        self._discriminant_points_exact = None
-        self.discriminant_points()  # sets the base point of the surface
+        self._base_sheets = base_sheets
+        self._kappa = kappa
 
-        # set the base sheets
-        if base_sheets:
-            self._base_sheets = base_sheets
-        else:
-            self._base_sheets = self.base_sheets()
-
-        # cache for key calculations
-        self._base_place = self(self._base_point)[0]
-        self._period_matrix = None
-        self._riemann_matrix = None
-        self._genus = None
-        self._holomorphic_differentials = None
+        # still need to fix base_point / base_sheet interaction
         self._path_factory = None
 
     def __repr__(self):
@@ -113,7 +117,8 @@ class RiemannSurface(object):
             or x,y-projection `(alpha, beta)`, if `beta` is provided.
 
         """
-        return self.places(alpha, beta=beta)
+        places = self.places(alpha, beta=beta)
+        return places
 
     def places(self, alpha, beta=None):
         r"""Returns a place or places on the Riemann surface with the given x-projection
@@ -193,128 +198,20 @@ class RiemannSurface(object):
         """
         self.path_factory.show_paths(ax=ax, *args, **kwds)
 
-    def discriminant_points(self, exact=True):
-        r"""Returns the discriminant points of the underlying curve.
-
-        A discriminant point :math:`x=b` is an x-point where at least one
-        y-root lying above has multiplicity greater than one. A
-        :class:`PuiseuxTSeries` is required to represent a place on the Riemann
-        surface whose x-projection is a discriminant point. These kinds of
-        places are of type :class:`DiscriminantPlace`.
-
-        .. note::
-
-            The ordering of the discriminant points is important for the
-            purposes of computing the monodromy group, which is done in the
-            :class:`RiemannSurfacePathFactory` attribute, `PathFactory`.
-
-        Parameters
-        ----------
-        exact : boolean
-            If `True`, returns symbolic discriminant points. Otherwise,
-            returns a numerical approximation. Both are cached for
-            performance.
-
-        Returns
-        -------
-        list
-            A list of the discriminant points of the underlying curve.
-
-        """
-        # use cached discriminant points if available
-        if not self._discriminant_points is None:
-            if exact:
-                return self._discriminant_points_exact
-            return self._discriminant_points
-
-        # compute the symbolic and numerical discriminant points
-        f = self.f
-        x,y = f.parent().gens()
-        res = f.resultant(f.derivative(y),y).univariate_polynomial()
-        rts = res.roots(ring=QQbar, multiplicities=False)
-        discriminant_points_exact = numpy.array(rts)
-        discriminant_points = discriminant_points_exact.astype(numpy.complex)
-
-        # determine a base_point, if not specified
-        if self._base_point is None:
-            a = min(bi.real - 1 for bi in discriminant_points)
-            aint = numpy.complex(numpy.floor(a))
-            self._base_point = aint
-
-        # sort the discriminant points first by argument with the base point
-        # and then by distance from the base point.
-        centered_points = discriminant_points - a
-        distances = numpy.abs(centered_points)
-        arguments = numpy.angle(centered_points)
-        sort_index = numpy.lexsort((distances, arguments))
-
-        # cache and return
-        self._discriminant_points_exact = discriminant_points_exact[sort_index]
-        self._discriminant_points = discriminant_points[sort_index]
-        if exact:
-            return self._discriminant_points_exact
-        return self._discriminant_points
-
-    def closest_discriminant_point(self, x, exact=True):
-        r"""Returns the closest discriminant point to a point x.
-
-        An often-used helper function by several components of
-        :class:`RiemannSurface`.
-
-        Parameters
-        ----------
-        x : complex
-            A complex x-point.
-        exact : boolean
-            If `True`, returns a `sympy.Expr` representing the discriminant
-            point exactly. Otherwise, returns a numerical approximation.
-
-        Returns
-        -------
-        complex or sympy.Expr
-            The discriminant point, either exact or numerical.
-        """
-        b = self.discriminant_points(exact=exact)
-        bf = self.discriminant_points(exact=False)
-
-        # for performance, coerce everything to floating point approximations.
-        # if the discriminant points are less than 1e-16 apart then we're
-        # screwed, anyway.
-        x = numpy.complex(x)
-        idx = numpy.argmin(numpy.abs(bf - x))
-        if exact:
-            return b[idx]
-        return bf[idx]
-
     # Monodromy: expose some methods / properties of self.Monodromy without
     # subclassing (since it doesn't make sense that a Riemann surface is a type
     # of Monodromy group.)
     def monodromy_group(self):
         r"""Returns the monodromy group of the underlying curve.
 
-	    The monodromy group is represented by a list of four items:
+        The monodromy group is represented by a list of four items:
 
         * `base_point` - a point in the complex x-plane where every monodromy
           path begins and ends,
         * `base_sheets` - the y-roots of the curve lying above `base_point`,
         * `branch_points` - the branch points of the curve,
-        * `permutations` - the permutations of he base sheets corresponding
-          to each branch point.
-
-        """
-        return self.path_factory.monodromy_group()
-
-    def base_point(self):
-        r"""Returns the base x-point of the Riemann surface.
-        """
-        return self._base_point
-
-    def base_place(self):
-        r"""Returns the base place of the Riemann surface.
-
-        The base place is the place from which all paths on the Riemann
-        surface are constructed. The AbelMap begins integrating from the
-        base place.
+        * `permutations` - the permutations of he base sheets corresponding to
+          each branch point.
 
         Parameters
         ----------
@@ -322,69 +219,16 @@ class RiemannSurface(object):
 
         Returns
         -------
-        base_place : Place
-
+        monodromy : list
+            The monodromy group information described above.
         """
-        return self._base_place
-
-    def base_sheets(self):
-        r"""Returns the base sheets of the Riemann surface.
-
-        The base sheets are the y-roots lying above the base point of the
-        surface. The base place of the Riemann surface is given by the base
-        x-point and the first element of the base sheets.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        list, complex
-            An ordered list of roots lying above the base point of the
-            curve.
-
-        """
-        # returned cached base sheets if availabe
-        if not self._base_sheets is None:
-            return self._base_sheets
-        self._base_sheets = self.lift(self._base_point)
-        return self._base_sheets
-
-    def lift(self, x0):
-        r"""List the x-point `x` to the fibre of y-roots.
-
-        Basically, computes the y-roots of :math:`f(x,y) = 0` for a given `x`.
-
-        .. note::
-
-            The y-roots are given in no particular order. Be careful
-            when using these to construct :class:`RiemannSurfacePath`
-            objects.
-
-        Parameters
-        ----------
-        x0 : complex
-            A point in the complex x-plane.
-
-        Returns
-        -------
-        list, complex
-        """
-        # compute the base sheets
-        R = self.f.parent()
-        x,y = R.gens()
-        p = self.f(x0,y).univariate_polynomial()
-        lift = p.roots(ring=p.base_ring(), multiplicities=False)
-        return lift
-
-    def base_lift(self):
-        r"""Same as :meth:`base_sheets`."""
-        return self.base_sheets()
+        monodromy = self.path_factory.monodromy_group()
+        return monodromy
 
     def branch_points(self):
         return self.path_factory.branch_points()
 
+    @cached_function
     def holomorphic_differentials(self):
         r"""Returns a basis of holomorphic differentials on the surface.
 
@@ -394,12 +238,12 @@ class RiemannSurface(object):
 
         Returns
         -------
-        list, HolomorphicDifferential
+        differentials : list
+            A list of holomorphic differentials forming a basis.
 
         """
-        if not self._holomorphic_differentials:
-            self._holomorphic_differentials = differentials(self)
-        return self._holomorphic_differentials
+        differentials = differentials(self)
+        return differentials
 
     def holomorphic_oneforms(self):
         r"""Alias for :meth:`holomorphic_differentials`."""
@@ -409,34 +253,77 @@ class RiemannSurface(object):
         r"""Alias for :meth:`holomorphic_differentials`."""
         return self.holomorphic_differentials()
 
+    @cached_method
     def genus(self):
-        if not self._genus:
-            self._genus = genus(self.f)
-        return self._genus
+        r"""The genus of this Riemann surface.
+
+        Returns
+        -------
+        genus : int
+        """
+        genus = genus(self.f)
+        return genus
 
     def a_cycles(self):
+        r"""Returns the a-cycles of the Riemann surface.
+
+        See Also
+        --------
+        :func:`PathFactory.a_cycles`
+        """
         return self.path_factory.a_cycles()
 
     def b_cycles(self):
+        r"""Returns the b-cycles of the Riemann surface.
+
+        See Also
+        --------
+        :func:`PathFactory.b_cycles`
+        """
         return self.path_factory.b_cycles()
 
     def c_cycles(self):
+        r"""Returns the c-cycles of the Riemann surface.
+
+        The c-cycles of a Riemann surface are intermediate cycles from which
+        the a- and b-cycles are built. See :func:`PathFactory.c_cycles` and
+        :func:`YPathFactory.c_cycles` for more information on how these are
+        used.
+
+        See Also
+        --------
+        :func:`PathFactory.c_cycles`
+        """
         return self.path_factory.c_cycles()
 
-    def path(self, P, P0=None):
+    def path(self, P):
         r"""Constructs a path to the place `P`.
+
+        Computes a :class:`RiemannSurfacePath` starting at the base place of
+        the surface.
+
+        .. note::
+
+            Currently, target places close to, but not equal to, discriminant
+            places of the curve are not allowed.
 
         Parameters
         ----------
         P : Place
-            The place
+            The target place.
 
         Returns
         -------
-        RiemannSurfacePath
+        gamma : RiemannSurfacePath
+            A path from :math:`P_0` to :math:`P`.
+
+        See Also
+        --------
+        :func:`PathFactory.path_to_place`
 
         """
-        return self.path_factory.path_to_place(P)
+        gamma = self.path_factory.path_to_place(P)
+        return gamma
 
     def integrate(self, omega, gamma):
         r"""Integrate the differential `omega` over the path `gamma`.
@@ -450,12 +337,14 @@ class RiemannSurface(object):
 
         Returns
         -------
-        complex
+        integral : complex
             The integral of `omega` on `gamma`.
 
         """
-        return gamma.integrate(omega)
+        integral = gamma.integrate(omega)
+        return integral
 
+    @cached_method
     def period_matrix(self):
         r"""Returns the period matrix of the Riemann surface.
 
@@ -468,13 +357,13 @@ class RiemannSurface(object):
 
         Returns
         -------
-        numpy.array
-            A :math:`g \times 2g` complex matrix of periods.
+        tau : matrix.
+            A :math:`g \times 2g` complex matrix of periods. The first :math:`g
+            \times g` block consists of the a-periods. The second block
+            contains the b-periods.
 
         """
-        if not (self._period_matrix is None):
-            return self._period_matrix
-
+        # compute the c-cycle periods
         c_cycles, linear_combinations = self.c_cycles()
         oneforms = self.holomorphic_oneforms()
         c_periods = []
@@ -486,7 +375,8 @@ class RiemannSurface(object):
                 omega_periods.append(self.integrate(omega, gamma))
             c_periods.append(omega_periods)
 
-        # take appropriate linear combinations of the c-periods to
+        # take appropriate linear combinations of the c-periods, using the
+        # linear combinations information computed by the path factory, to
         # obtain the a- and b-periods
         #
         # tau[i,j] = \int_{a_j} \omega_i,  j < g
@@ -497,10 +387,9 @@ class RiemannSurface(object):
             for j in range(2*g):
                 tau[i,j] = sum(linear_combinations[j,k] * c_periods[i][k]
                                for k in range(m))
+        return tau
 
-        self._period_matrix = tau
-        return self._period_matrix
-
+    @cached_method
     def riemann_matrix(self):
         r"""Returns the Riemann matrix of the Riemann surface.
 
@@ -517,17 +406,13 @@ class RiemannSurface(object):
 
         Returns
         -------
-        numpy.array
-            A :math:`g \times g` Riemann matrix corresponding to the
-            Riemann surface.
+        omega : mathrix
+            The :math:`g \times g` Riemann matrix of the Riemann surface.
 
         """
-        if not self._riemann_matrix is None:
-            return self._riemann_matrix
-
         g = self.genus()
         tau = self.period_matrix()
         A = tau[:,:g]
         B = tau[:,g:]
-        self._riemann_matrix = numpy.dot(scipy.linalg.inv(A), B)
-        return self._riemann_matrix
+        omega = numpy.dot(scipy.linalg.inv(A), B)
+        return omega

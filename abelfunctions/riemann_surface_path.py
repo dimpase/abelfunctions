@@ -770,8 +770,8 @@ class RiemannSurfacePathPuiseux(RiemannSurfacePathPrimitive):
         # if the complex path leads to a discriminant point then get the exact
         # representation of said discrimimant point
         target_point = complex_path(1)
-        if not target_point == infinity:
-            discriminant_point = riemann_surface.closest_discriminant_point(target_point)
+        if not target_point == infinity: # numpy infinity and / or sage infinity?
+            discriminant_point = riemann_surface.path_factory.closest_discriminant_point(target_point)
             if abs(target_point - discriminant_point) < 1e-12:
                 target_point = discriminant_point
             else:
