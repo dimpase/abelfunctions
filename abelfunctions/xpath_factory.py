@@ -374,7 +374,9 @@ class XPathFactoryAbel(XPathFactory):
 
         """
         Ri = self.radius(bi)
-        z = bi - Ri
+        l = lambda s: self.base_point() + (bi-self.base_point())*s
+        s = 1.0 - Ri/abs(self.base_point() - bi)
+        z = l(s)
         return self.xpath_build_avoiding_path(self.base_point(), z)
 
     def xpath_around_discriminant_point(self, bi, nrots=1):
@@ -391,13 +393,13 @@ class XPathFactoryAbel(XPathFactory):
             A number of rotations around this discriminant point.
 
         """
-        # note that the Deconinck, van Hoeij paths always meet the
-        # bounding circle on the left
         Ri = self.radius(bi)
+        z = self.xpath_to_discriminant_point(bi)[-1][1]
+        theta = numpy.angle(numpy.complex(z - bi))
         dtheta = numpy.pi if nrots > 0 else -numpy.pi
         circle = [
-            (Ri, bi, -numpy.pi, dtheta),
-            (Ri, bi, 0, dtheta)
+            (Ri, bi, theta, dtheta),
+            (Ri, bi, theta + dtheta, dtheta)
             ]
         return circle * abs(nrots)
 
