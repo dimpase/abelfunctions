@@ -322,6 +322,10 @@ class TestMonodromyPath(unittest.TestCase):
         f = y**3 + 2*x**3*y - x**7
         X = RiemannSurface(f)
         PF = RiemannSurfacePathFactory(X)
+        b = PF.discriminant_points
+        gamma = PF.monodromy_path(b[0])
+
+        
 
 # class TestMonodromy(AbelfunctionsTestCase):
 #     def test_f1(self):
