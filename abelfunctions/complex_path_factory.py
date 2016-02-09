@@ -392,7 +392,7 @@ class ComplexPathFactory(object):
         if len(segments) == 1:
             path = segments[0]
         else:
-            path = ComplexPath(*segments)
+            path = ComplexPath(segments)
         return path
 
 
@@ -477,7 +477,7 @@ class ComplexPathFactory(object):
         # circles of discriminant points. in this case, the path only consists
         # of the arcs defining the circle
         if abs(self.base_point + R) < 1e-15:
-            path = ComplexPath(*path.segments[1:-1])
+            path = ComplexPath(path.segments[1:-1])
         return path
 
     def complex_path_to_point(self, x):

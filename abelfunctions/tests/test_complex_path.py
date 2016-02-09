@@ -74,6 +74,19 @@ class TestConstruction(unittest.TestCase):
                 self.assertEqual(segment, gamma0)
             index += 1
 
+    def test_equality(self):
+        gamma0 = ComplexLine(-1, 0)
+        gamma1 = ComplexLine(-1, 0)
+        self.assertEqual(gamma0, gamma1)
+
+        gamma0 = ComplexArc(1, 0, 0, pi)
+        gamma1 = ComplexArc(1, 0, 0, pi)
+        self.assertEqual(gamma0, gamma1)
+
+        gamma0 = ComplexRay(-1)
+        gamma1 = ComplexRay(-1)
+        self.assertEqual(gamma0, gamma1)
+
 class TestReverse(unittest.TestCase):
     def test_single_line(self):
         gamma = ComplexLine(-1,2)

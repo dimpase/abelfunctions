@@ -41,6 +41,12 @@ INCLUDES_NUMPY = [os.path.join(SAGE_LOCAL,'lib','python','site-packages',
                                'numpy','core','include')]
 
 ext_modules = [
+    Extension('abelfunctions.complex_path',
+              sources=[
+                  os.path.join('abelfunctions',
+                               'complex_path.pyx')],
+              extra_compile_args = ['-std=c99'],
+          ),
     Extension('abelfunctions.puiseux_series_ring_element',
               sources=[
                   os.path.join('abelfunctions',
