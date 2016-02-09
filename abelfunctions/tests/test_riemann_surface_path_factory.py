@@ -1,4 +1,5 @@
 import unittest
+from abelfunctions.tests.test_abelfunctions import AbelfunctionsTestCase
 
 from abelfunctions.complex_path import (
     ComplexPathPrimitive,
@@ -235,8 +236,7 @@ class TestFromComplexPath(unittest.TestCase):
         self.assertAlmostEqual(gamma.get_y(1.0)[0], 0)
         self.assertAlmostEqual(gamma.get_y(1.0)[1], 0)
 
-
-class TestMonodromy(unittest.TestCase):
+class TestMonodromyPath(unittest.TestCase):
     def setUp(self):
         R = QQ['x,y']
         x,y = R.gens()
@@ -284,7 +284,6 @@ class TestMonodromy(unittest.TestCase):
         self.assertAlmostEqual(gamma.get_y(1.0)[0], sqrt(5))
         self.assertAlmostEqual(gamma.get_y(1.0)[1], -sqrt(5))
 
-
     def test_monodromy(self):
         oo = infinity
 
@@ -317,3 +316,34 @@ class TestMonodromy(unittest.TestCase):
         self.assertEqual(permutations[1], Permutation([2,0,1]))
         self.assertEqual(permutations[2], Permutation([2,0,1]))
 
+    def test_f2(self):
+        R = QQ['x,y']
+        x,y = R.gens()
+        f = y**3 + 2*x**3*y - x**7
+        X = RiemannSurface(f)
+        PF = RiemannSurfacePathFactory(X)
+
+# class TestMonodromy(AbelfunctionsTestCase):
+#     def test_f1(self):
+#         X = RiemannSurface(self.f1)
+#         PF = X.path_factory
+#         branch_points, permutations = PF.monodromy_group()
+#         self.assertTrue(True)
+
+#     def test_f2(self):
+#         X = RiemannSurface(self.f2)
+#         PF = X.path_factory
+#         branch_points, permutations = PF.monodromy_group()
+#         self.assertTrue(True)
+
+#     def test_f4(self):
+#         X = RiemannSurface(self.f2)
+#         PF = X.path_factory
+#         branch_points, permutations = PF.monodromy_group()
+#         self.assertTrue(True)
+
+#     def test_f5(self):
+#         X = RiemannSurface(self.f2)
+#         PF = X.path_factory
+#         branch_points, permutations = PF.monodromy_group()
+#         self.assertTrue(True)

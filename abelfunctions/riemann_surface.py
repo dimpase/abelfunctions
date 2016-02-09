@@ -57,6 +57,14 @@ class RiemannSurface(object):
         return RegularPlace(self, alpha, beta)
 
     @property
+    def branch_points(self):
+        return self.path_factory.branch_points
+
+    @property
+    def discriminant_points(self):
+        return self.path_factory.discriminant_points
+
+    @property
     def path_factory(self):
         if not self._path_factory:
             self._path_factory = RiemannSurfacePathFactory(
@@ -157,7 +165,7 @@ class RiemannSurface(object):
         except TypeError:
             alpha = numpy.complex(alpha)
             exact = False
-        b = self.closest_discriminant_point(alpha,exact=exact)
+        b = self.path_factory.closest_discriminant_point(alpha,exact=exact)
 
         # if alpha is equal to or close to a discriminant point then return a
         # discriminant place
@@ -225,9 +233,6 @@ class RiemannSurface(object):
         monodromy = self.path_factory.monodromy_group()
         return monodromy
 
-    def branch_points(self):
-        return self.path_factory.branch_points()
-
     @cached_function
     def holomorphic_differentials(self):
         r"""Returns a basis of holomorphic differentials on the surface.
@@ -261,8 +266,8 @@ class RiemannSurface(object):
         -------
         genus : int
         """
-        genus = genus(self.f)
-        return genus
+        g = genus(self.f)
+        return g
 
     def a_cycles(self):
         r"""Returns the a-cycles of the Riemann surface.

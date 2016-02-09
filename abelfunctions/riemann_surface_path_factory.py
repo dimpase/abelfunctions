@@ -30,6 +30,7 @@ from abelfunctions.complex_path import (
     ComplexLine,
     ComplexArc,
     ComplexRay,
+    ComplexPath,
 )
 from abelfunctions.divisor import RegularPlace
 from abelfunctions.riemann_surface_path import (
@@ -42,7 +43,8 @@ from abelfunctions.utilities import (
     matching_permutation,
     )
 from abelfunctions.complex_path_factory import ComplexPathFactory
-from abelfunctions.skeleton import Skeleton
+#from abelfunctions.skeleton import Skeleton
+from abelfunctions.ypath_factory import YPathFactory as Skeleton
 
 from numpy import complex, double, array
 from sage.all import infinity, CC, cached_method
@@ -112,9 +114,9 @@ class RiemannSurfacePathFactory(object):
     @property
     def skeleton(self):
         if not self._skeleton:
-            self._skeleton = Skeleton(
-                self.base_point, self.base_sheets, self.monodromy_group(),
-                self.riemann_surface.genus())
+            mon = (self.base_point, self.base_sheets) + \
+                  self.monodromy_group()
+            self._skeleton = Skeleton(self.riemann_surface, mon)
         return self._skeleton
 
     def __init__(self, riemann_surface, base_point=None, base_sheets=None,
@@ -174,8 +176,9 @@ class RiemannSurfacePathFactory(object):
         # skeleton is computed when first used
         self._skeleton = None
 
-    def __str__(self):
-        return 'Riemann Surface Path Factory for %s'%(self.RS)
+    def __repr__(self):
+        s = 'Path Factory for %s'%(self.riemann_surface)
+        return s
 
     def show_paths(self, *args, **kwds):
         r"""Plots all of the monodromy paths of the curve.
@@ -532,11 +535,15 @@ class RiemannSurfacePathFactory(object):
             A list fo tuples defining a y-path. The output of
             `self.a_cycles()`, `self.b_cycles()`, etc.
         """
-        xpath = []
+        segments = []
         for bi, nrots in cycle:
-            xpath_i = self.complex_path_factory.complex_path_monodromy_path(bi, nrots=nrots)
-            xpath.extend(xpath_i)
-        return self.RiemannSurfacePath_from_xpath(xpath)
+            gammax_i = self.complex_path_factory.complex_path_monodromy_path(
+                bi, nrots=nrots)
+            segments.append(gammax_i)
+
+        gammax = ComplexPath(*segments)
+        gamma = self.RiemannSurfacePath_from_complex_path(gammax)
+        return gamma
 
     def RiemannSurfacePath_from_complex_path(self, complex_path, x0=None, y0=None):
         r"""Constructs a :class:`RiemannSurfacePath` object from x-path data.

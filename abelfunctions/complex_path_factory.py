@@ -207,9 +207,10 @@ class ComplexPathFactory(object):
             return radii
 
         # when there is more than one discriminant point we scale disctances
-        # accordingly
+        # accordingly. coerce to numerical.
         radii = []
-        for bi in self.discriminant_points:
+        b = numpy.array(self.discriminant_points, dtype=complex)
+        for bi in b:
             dists = [abs(bi - bj) for bj in self.discriminant_points
                      if bi != bj]
             rho = min(dists)
@@ -219,13 +220,12 @@ class ComplexPathFactory(object):
 
         # final check: assert that the base point is sufficiently far away from
         # the discriminant points
-        dists = [abs(bi - self.base_point) for bi in self.discriminant_points]
+        dists = [abs(bi - self.base_point) for bi in b]
         dists = numpy.array(dists, dtype=double) - radii
         if any(dists < 0):
             raise ValueError('Base point lies in the bounding circles of the '
                              'discriminant points. Use different base point or '
                              'circle scaling factor kappa.')
-
         return radii
 
     def radius(self, bi):
@@ -306,8 +306,6 @@ class ComplexPathFactory(object):
             A discriminant point of the curve.
         nrots : integer (default `1`)
             A number of rotations around this discriminant point.
-        starting_point : complex
-            A point on the bounding circle 
 
         Returns
         -------
