@@ -135,7 +135,7 @@ class ComplexPathFactory(object):
 
         # determine a base_point, if not specified
         if not base_point:
-            a = min(real_part(bi) for bi in discriminant_points)
+            a = min(complex(bi).real for bi in discriminant_points)
             a = a - 1
             aint = complex(floor(a))
             base_point = aint
@@ -395,7 +395,6 @@ class ComplexPathFactory(object):
             path = ComplexPath(segments)
         return path
 
-
     def complex_path_monodromy_path(self, bi, nrots=1):
         """Returns the complex path starting from the base point, going around the
         discriminant point `bi` `nrots` times, and returning to the base
@@ -493,11 +492,6 @@ class ComplexPathFactory(object):
 
     def show_paths(self, *args, **kwds):
         """Plots all of the monodromy paths of the curve.
-
-        Parameters
-        ----------
-        ax : matplotlib.Axes
-            The figure axes on which to plot the paths.
 
         Returns
         -------

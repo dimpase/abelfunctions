@@ -192,7 +192,7 @@ class RiemannSurface(object):
         places = [RegularPlace(self, alpha, beta) for beta in yroots]
         return places
 
-    def show_paths(self, ax=None, *args, **kwds):
+    def show_paths(self, *args, **kwds):
         """Plots all of the monodromy paths of the curve.
 
         Parameters
@@ -204,7 +204,7 @@ class RiemannSurface(object):
         -------
         None
         """
-        self.path_factory.show_paths(ax=ax, *args, **kwds)
+        self.path_factory.show_paths(*args, **kwds)
 
     # Monodromy: expose some methods / properties of self.Monodromy without
     # subclassing (since it doesn't make sense that a Riemann surface is a type
@@ -233,7 +233,6 @@ class RiemannSurface(object):
         monodromy = self.path_factory.monodromy_group()
         return monodromy
 
-    @cached_function
     def holomorphic_differentials(self):
         r"""Returns a basis of holomorphic differentials on the surface.
 
@@ -247,8 +246,8 @@ class RiemannSurface(object):
             A list of holomorphic differentials forming a basis.
 
         """
-        differentials = differentials(self)
-        return differentials
+        value = differentials(self)
+        return value
 
     def holomorphic_oneforms(self):
         r"""Alias for :meth:`holomorphic_differentials`."""
