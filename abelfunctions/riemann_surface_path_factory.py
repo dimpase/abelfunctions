@@ -441,7 +441,7 @@ class RiemannSurfacePathFactory(object):
 
         return branch_points, permutations
 
-    def monodromy_path(self, bi):
+    def monodromy_path(self, bi, nrots=1):
         """Returns the monodromy path around the discriminant point `bi`.
 
         Parameters
@@ -457,7 +457,7 @@ class RiemannSurfacePathFactory(object):
             The path encircling the branch point `bi`.
 
         """
-        xpath = self.complex_path_factory.complex_path_monodromy_path(bi)
+        xpath = self.complex_path_factory.complex_path_monodromy_path(bi, nrots=nrots)
         gamma = self.RiemannSurfacePath_from_complex_path(xpath)
         return gamma
 
@@ -539,12 +539,12 @@ class RiemannSurfacePathFactory(object):
         for bi, nrots in cycle:
             gammax_i = self.complex_path_factory.complex_path_monodromy_path(
                 bi, nrots=nrots)
-            segments.append(gammax_i)
+            segments.extend(gammax_i.segments)
 
         gammax = ComplexPath(*segments)
         gamma = self.RiemannSurfacePath_from_complex_path(gammax)
         return gamma
-
+    
     def RiemannSurfacePath_from_complex_path(self, complex_path, x0=None, y0=None):
         r"""Constructs a :class:`RiemannSurfacePath` object from x-path data.
 

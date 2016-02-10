@@ -253,7 +253,7 @@ class ComplexPath(ComplexPathPrimitive):
         # if explicit points are given then plot as usual
         if (isinstance(plot_points, list) or
             isinstance(plot_points, numpy.ndarray)):
-            return ComplexPathPrimitive.plot(self, s_seg, )
+            return ComplexPathPrimitive.plot(self, plot_points)
 
         # otherwise, plot one segment at a time so as to include the endpoints
         # of each segment (otherwise, it looks fragmented)

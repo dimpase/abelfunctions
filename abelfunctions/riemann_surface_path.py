@@ -36,6 +36,7 @@ Contents
 """
 
 import numpy
+import scipy
 from abelfunctions.divisor import DiscriminantPlace
 from abelfunctions.puiseux import puiseux
 from abelfunctions.utilities import matching_permutation
@@ -335,7 +336,7 @@ class RiemannSurfacePathPrimitive(object):
     def analytically_continue(xi, yi, xip1):
         raise NotImplementedError('Implement in subclass.')
 
-    def integrate(omega):
+    def integrate(self, omega):
         r"""Integrate `omega` along this path.
 
         Parameters
@@ -633,7 +634,7 @@ class RiemannSurfacePath(RiemannSurfacePathPrimitive):
                 values[k*ppseg+j] = values_seg[j]
         return values
 
-    def integrate(omega):
+    def integrate(self, omega):
         r"""Integrate `omega` along this path.
 
         Parameters

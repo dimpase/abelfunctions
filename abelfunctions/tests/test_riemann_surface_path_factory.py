@@ -316,38 +316,159 @@ class TestMonodromyPath(unittest.TestCase):
         self.assertEqual(permutations[1], Permutation([2,0,1]))
         self.assertEqual(permutations[2], Permutation([2,0,1]))
 
-    def test_f2(self):
+    def test_monodromy_path_rotations(self):
+        # test that if we rotate around the branch point a number of times
+        # equal to the order of the permutation we arrive where we started.
+
+        # all branch points have order two permutations
+        PF = RiemannSurfacePathFactory(self.X1)
+        gamma = PF.monodromy_path(0, nrots=2)
+        y0 = gamma.get_y(0.0)
+        y1 = gamma.get_y(1.0)
+        self.assertAlmostEqual(y0[0], y1[0])
+        self.assertAlmostEqual(y0[1], y1[1])
+
+        PF = RiemannSurfacePathFactory(self.X2)
+        gamma = PF.monodromy_path(QQbar(-I), nrots=2)
+        y0 = gamma.get_y(0.0)
+        y1 = gamma.get_y(1.0)
+        self.assertAlmostEqual(y0[0], y1[0])
+        self.assertAlmostEqual(y0[1], y1[1])
+
+        # all branch points have order three permutations
+        PF = RiemannSurfacePathFactory(self.X4)
+        gamma = PF.monodromy_path(QQbar(I), nrots=3)
+        y0 = gamma.get_y(0.0)
+        y1 = gamma.get_y(1.0)
+        self.assertAlmostEqual(y0[0], y1[0])
+        self.assertAlmostEqual(y0[1], y1[1])
+        self.assertAlmostEqual(y0[2], y1[2])
+
+
+class TestCycles(unittest.TestCase):
+    def setUp(self):
         R = QQ['x,y']
         x,y = R.gens()
-        f = y**3 + 2*x**3*y - x**7
+
+        f1 = y**2 - x
+        self.f1 = f1
+        self.X1 = RiemannSurface(f1)
+
+        f2 = y**2 - (x**2 + 1)
+        self.f2 = f2
+        self.X2 = RiemannSurface(f2)
+
+        f3 = y**2 - (x**4 - 1)
+        self.f3 = f3
+        self.X3 = RiemannSurface(f3)
+
+        f4 = y**3 - (x**2 + 1)
+        self.f4 = f4
+        self.X4 = RiemannSurface(f4)
+
+    def test_closed(self):
+        # tests that the cycles are, indeed, cycles
+        PF = RiemannSurfacePathFactory(self.X3)
+        cycles = PF.a_cycles()
+        for a in cycles:
+            x0 = a.get_x(0)
+            y0 = a.get_y(0)
+            x1 = a.get_x(1)
+            y1 = a.get_y(1)
+            self.assertAlmostEqual(x0, x1)
+            self.assertAlmostEqual(y0[0], y1[0])
+            self.assertAlmostEqual(y0[1], y1[1])
+
+        PF = RiemannSurfacePathFactory(self.X4)
+        cycles = PF.a_cycles()
+        for a in cycles:
+            x0 = a.get_x(0)
+            y0 = a.get_y(0)
+            x1 = a.get_x(1)
+            y1 = a.get_y(1)
+            self.assertAlmostEqual(x0, x1)
+            self.assertAlmostEqual(y0[0], y1[0])
+            self.assertAlmostEqual(y0[1], y1[1])
+            self.assertAlmostEqual(y0[2], y1[2])
+
+    def test_RSP_from_cycle(self):
+        # tests that cycles can be constructed from (branch_point, rotations)
+
+        # in this example, each permutation is order 2 so any even combination
+        # of monodromy paths should produce a cycle
+        PF = RiemannSurfacePathFactory(self.X3)
+        b = PF.branch_points
+        cycle = [(b[0], 1), (b[1], -1)]
+        gamma = PF.RiemannSurfacePath_from_cycle(cycle)
+        x0 = gamma.get_x(0)
+        y0 = gamma.get_y(0)
+        x1 = gamma.get_x(1)
+        y1 = gamma.get_y(1)
+        self.assertAlmostEqual(x0, x1)
+        self.assertAlmostEqual(y0[0], y1[0])
+        self.assertAlmostEqual(y0[1], y1[1])
+
+        cycle = [(b[0], 3), (b[1], 5)]
+        gamma = PF.RiemannSurfacePath_from_cycle(cycle)
+        x0 = gamma.get_x(0)
+        y0 = gamma.get_y(0)
+        x1 = gamma.get_x(1)
+        y1 = gamma.get_y(1)
+        self.assertAlmostEqual(x0, x1)
+        self.assertAlmostEqual(y0[0], y1[0])
+        self.assertAlmostEqual(y0[1], y1[1])
+
+        # in this example, each permutation is order 3 and is the same
+        # permutation (0 2 1) (in disjoint cycle notation)
+        PF = RiemannSurfacePathFactory(self.X4)
+        b = PF.branch_points
+        cycle = [(b[0], 1), (b[1], 1), (b[2], 1)]
+        gamma = PF.RiemannSurfacePath_from_cycle(cycle)
+        x0 = gamma.get_x(0)
+        y0 = gamma.get_y(0)
+        x1 = gamma.get_x(1)
+        y1 = gamma.get_y(1)
+        self.assertAlmostEqual(x0, x1)
+        self.assertAlmostEqual(y0[0], y1[0])
+        self.assertAlmostEqual(y0[1], y1[1])
+        self.assertAlmostEqual(y0[2], y1[2])
+
+        cycle = [(b[0], 2), (b[1], 1)]
+        gamma = PF.RiemannSurfacePath_from_cycle(cycle)
+        x0 = gamma.get_x(0)
+        y0 = gamma.get_y(0)
+        x1 = gamma.get_x(1)
+        y1 = gamma.get_y(1)
+        self.assertAlmostEqual(x0, x1)
+        self.assertAlmostEqual(y0[0], y1[0])
+        self.assertAlmostEqual(y0[1], y1[1])
+        self.assertAlmostEqual(y0[2], y1[2])
+
+        cycle = [(b[0], 4), (b[1], -1), (b[2], 3)]
+        gamma = PF.RiemannSurfacePath_from_cycle(cycle)
+        x0 = gamma.get_x(0)
+        y0 = gamma.get_y(0)
+        x1 = gamma.get_x(1)
+        y1 = gamma.get_y(1)
+        self.assertAlmostEqual(x0, x1)
+        self.assertAlmostEqual(y0[0], y1[0])
+        self.assertAlmostEqual(y0[1], y1[1])
+        self.assertAlmostEqual(y0[2], y1[2])
+
+    def test_f2_from_cycle_issue(self):
+        # there is an unlabeled issue with the construction of certain cycles
+        # on the curve f2. it turned out that RiemannSurfacePath_from_cycle had
+        # incorrectly created a ComplexPath from the segments
+        #
+        # this tests is here just to assert that no errors are raised or that
+        # the calculation doesn't time out
+        R = QQ['x,y']
+        x,y = R.gens()
+        f = -x**7 + 2*x**3*y + y**3
+
         X = RiemannSurface(f)
-        PF = RiemannSurfacePathFactory(X)
-        b = PF.discriminant_points
-        gamma = PF.monodromy_path(b[0])
-
-        
-
-# class TestMonodromy(AbelfunctionsTestCase):
-#     def test_f1(self):
-#         X = RiemannSurface(self.f1)
-#         PF = X.path_factory
-#         branch_points, permutations = PF.monodromy_group()
-#         self.assertTrue(True)
-
-#     def test_f2(self):
-#         X = RiemannSurface(self.f2)
-#         PF = X.path_factory
-#         branch_points, permutations = PF.monodromy_group()
-#         self.assertTrue(True)
-
-#     def test_f4(self):
-#         X = RiemannSurface(self.f2)
-#         PF = X.path_factory
-#         branch_points, permutations = PF.monodromy_group()
-#         self.assertTrue(True)
-
-#     def test_f5(self):
-#         X = RiemannSurface(self.f2)
-#         PF = X.path_factory
-#         branch_points, permutations = PF.monodromy_group()
-#         self.assertTrue(True)
+        PF = X.path_factory
+        a_tuples = PF.skeleton.a_cycles()
+        b_tuples = PF.skeleton.b_cycles()
+        for cycle in a_tuples + b_tuples:
+            gamma = PF.RiemannSurfacePath_from_cycle(cycle)
