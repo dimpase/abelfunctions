@@ -139,7 +139,7 @@ cdef class ComplexPath(ComplexPathPrimitive):
     """
     @property
     def segments(self):
-        return numpy.array(self._segments, dtype=ComplexPathPrimitive).tolist()
+        return numpy.asarray(self._segments).tolist()
 
     def __init__(self, segments):
         r"""Directly instantiate an ComplexPath composite from a list of
@@ -161,7 +161,7 @@ cdef class ComplexPath(ComplexPathPrimitive):
             if abs(gamma1(0.0) - gamma0(1.0)) > eps:
                 raise ValueError('Segments must form continuous path.')
 
-        self._segments = args
+        self._segments = numpy.array(segments, dtype=ComplexPathPrimitive)
         self._nsegments = n
 
     def __getitem__(self, index):

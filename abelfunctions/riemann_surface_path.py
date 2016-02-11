@@ -201,7 +201,7 @@ class RiemannSurfacePathPrimitive(object):
 
         complex_path = self.complex_path + other.complex_path
         gamma = RiemannSurfacePath(self.riemann_surface, complex_path,
-                                   self.y0, *segments)
+                                   self.y0, segments)
         return gamma
 
     def _nearest_checkpoint_index(self, s):
@@ -447,7 +447,7 @@ class RiemannSurfacePath(RiemannSurfacePathPrimitive):
     def segments(self):
         return self._segments
 
-    def __init__(self, riemann_surface, complex_path, y0, *args):
+    def __init__(self, riemann_surface, complex_path, y0, segments):
         r"""Directly instantiate a RiemannSurfacePath from a Riemann surface and a list
         of Riemann surface path primitives.
 
@@ -474,8 +474,8 @@ class RiemannSurfacePath(RiemannSurfacePathPrimitive):
         RiemannSurfacePathPrimitive.__init__(
             self, riemann_surface, complex_path, y0, ncheckpoints=0)
 
-        self._segments = list(args)
-        self._nsegments = len(args)
+        self._segments = segments
+        self._nsegments = len(segments)
 
     def __getitem__(self, index):
         return self._segments[index]

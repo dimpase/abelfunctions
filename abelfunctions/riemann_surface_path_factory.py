@@ -541,10 +541,10 @@ class RiemannSurfacePathFactory(object):
                 bi, nrots=nrots)
             segments.extend(gammax_i.segments)
 
-        gammax = ComplexPath(*segments)
+        gammax = ComplexPath(segments)
         gamma = self.RiemannSurfacePath_from_complex_path(gammax)
         return gamma
-    
+
     def RiemannSurfacePath_from_complex_path(self, complex_path, x0=None, y0=None):
         r"""Constructs a :class:`RiemannSurfacePath` object from x-path data.
 
@@ -595,5 +595,6 @@ class RiemannSurfacePathFactory(object):
             segments.append(segment)
 
         # build the entire path from the path segments
-        gamma = RiemannSurfacePath(self.riemann_surface, complex_path, y0, *segments)
+        gamma = RiemannSurfacePath(self.riemann_surface, complex_path, y0,
+                                   segments)
         return gamma
