@@ -374,16 +374,19 @@ class ComplexPathFactory(object):
         b = b.tolist()
         b.sort(key=lambda bi: numpy.abs(bi-z0))
         for bi in b:
-            # compute the intersection points of the segment from z0 to
-            # z1 with the circle around bi.
-            w0, w1 = self._intersection_points(z0,z1,bi)
+            Ri = self.radius(bi)
 
-            # compute the arc going from w0 to w1 avoiding the bounding
-            # circle around bi.
-            arc = self._avoiding_arc(w0,w1,bi)
+            # compute the intersection points of the segment from z0 to z1 with
+            # the circle around bi.
+            w0, w1 = self._intersection_points(z0,z1,bi,Ri)
+
+            # compute the arc going from w0 to w1 avoiding the bounding circle
+            # around bi.
+            arc = self._avoiding_arc(w0,w1,bi,Ri)
 
             # add to the path and update the loop
-            segments.append(ComplexLine(z0,w0))
+            if abs(z0 - w0) > 1e-12:
+                segments.append(ComplexLine(z0,w0))
             segments.append(arc)
             z0 = w1
 
@@ -513,7 +516,7 @@ class ComplexPathFactory(object):
             plt += path.plot(**kwds)
         return plt
 
-    def _intersection_points(self, z0, z1, bi):
+    def _intersection_points(self, z0, z1, bi, Ri):
         """Returns the complex points `w0,w1` where the line from `z0` to `z1`
         intersects the bounding circle around `bi`.
 
@@ -525,6 +528,8 @@ class ComplexPathFactory(object):
             Line ending point.
         bi : complex
             A discriminant point.
+        Ri : double
+            The radius of the circle around bi.
 
         Returns
         -------
@@ -538,7 +543,7 @@ class ComplexPathFactory(object):
         z0 = complex(z0)
         z1 = complex(z1)
         bi = complex(bi)
-        Ri = self.radius(bi)
+        Ri = double(Ri)
         v = z1 - z0
         w = z0 - bi
         p2 = v.real**2 + v.imag**2
@@ -555,7 +560,7 @@ class ComplexPathFactory(object):
         w1 = v*t[1] + z0   # second intersection point
         return w0, w1
 
-    def _avoiding_arc(self, w0, w1, bi):
+    def _avoiding_arc(self, w0, w1, bi, Ri):
         """Returns the arc `(radius, center, starting_theta, dtheta)`, from the points
         `w0` and `w1` on the bounding circle around `bi`.
 
@@ -570,6 +575,8 @@ class ComplexPathFactory(object):
             The ending point of the arc on the bounding circle of `bi`.
         bi : complex
             The discriminant point to avoid.
+        Ri : double
+            The radius of the bounding circle.
 
         Returns
         -------
@@ -577,33 +584,64 @@ class ComplexPathFactory(object):
             An arc from `w0` to `w1` around `bi`.
 
         """
-        # the angles of w0 and w1 around the circle tells us the length of the
-        # arc connecting the points
+        w0 = complex(w0)
+        w1 = complex(w1)
+        bi = complex(bi)
+        Ri = double(Ri)
+
+        # ASSUMPTION: Re(w0) < Re(w1)
+        if w0.real >= w1.real:
+            raise ValueError('Cannot construct avoiding arc: all paths must '
+                             'travel from left to right unless "reversed".')
+
+        # ASSERTION: w0 and w1 lie on the circle of radius Ri centered at bi
+        Ri0 = abs(w0 - bi)
+        Ri1 = abs(w1 - bi)
+        if abs(Ri0 - Ri) > 1e-13 or abs(Ri1 - Ri) > 1e-13:
+            raise ValueError('Cannot construct avoiding arc: '
+                             '%s and %s must lie on the bounding circle of '
+                             'radius %s centered at %s'%(w0,w1,Ri,bi))
+
+        # degenerate case: w0, bi, w1 are co-linear
+        #
+        # in this case always return an avoiding path going above the branch
+        # point. also in this case, dtheta = -pi. also note that this can be
+        # difficult to test from a floating point op. perspective
+        phi_w0_w1 = numpy.angle(w1-w0)
+        phi_w0_bi = numpy.angle(bi-w0)
+        if abs(phi_w0_w1 - phi_w0_bi) < 1e-13:
+            theta0 = numpy.angle(w0-bi)
+            return ComplexArc(Ri, bi, theta0, -numpy.pi)
+
+        # otherwise: w0, bi, w1 are not co-linear
+        #
+        # first determine if the line form w0 to w1 is above or below the
+        # branch point bi. this will determine if dtheta is negative or
+        # positive, respectively
+        if phi_w0_bi <= phi_w0_w1:
+            dtheta_sign = -1
+        else:
+            dtheta_sign = 1
+
+        # now determine the angle between w0 and w1 on the circle. since w0,
+        # bi, and w1 are not colinear this angle must be normalized to be in
+        # the interval (-pi,pi)
         theta0 = numpy.angle(w0 - bi)
         theta1 = numpy.angle(w1 - bi)
+        dtheta = theta1 - theta0
+        if dtheta > numpy.pi:
+            dtheta = 2*numpy.pi - dtheta
+        elif dtheta < -numpy.pi:
+            dtheta = 2*numpy.pi + dtheta
 
-        # the angles that w1 and bi make with w0 tell us whether the path will
-        # go above bi or below bi
-        phi1 = numpy.angle(w1 - w0)
-        phii = numpy.angle(bi - w0)
+        # sanity check: |dtheta| should be less than pi
+        if abs(dtheta) >= numpy.pi:
+            raise ValueError('Cannot construct avoiding arc: '
+                             '|dtheta| must be less than pi.')
 
-        # go above (counterclockwise) if w1 lies over bi
-        direction = numpy.sign(phii - phi1)
-        if (theta0 < 0) and (theta1 > 0):
-            theta0 += 2*numpy.pi
-        if (theta0 > 0) and (theta1 < 0):
-            theta1 += 2*numpy.pi
-        dtheta = min(abs(theta0 - theta1), abs(theta1 - theta0))
-        dtheta = direction*dtheta
-
-        # degenerate case when the path is colinear with bi: ALWAYS GO ABOVE
-        # bi!!! this implies that the furthest colinear discriminant points are
-        # "above" those that are closer.
-        if dtheta == 0:
-            dtheta = -numpy.pi
+        dtheta = dtheta_sign * abs(dtheta)
 
         # add the path from z0 to w1 going around bi
-        Ri = self.radius(bi)
         arc = ComplexArc(Ri, bi, theta0, dtheta)
         return arc
 

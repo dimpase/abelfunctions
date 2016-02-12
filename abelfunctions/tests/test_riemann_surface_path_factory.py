@@ -472,3 +472,19 @@ class TestCycles(unittest.TestCase):
         b_tuples = PF.skeleton.b_cycles()
         for cycle in a_tuples + b_tuples:
             gamma = PF.RiemannSurfacePath_from_cycle(cycle)
+
+class TestGenus43(unittest.TestCase):
+    def setUp(self):
+        R = QQ['x,y']; x,y = R.gens()
+        f43 = y**3*((y**4-16)**2 - 2*x) - x**12
+        self.f43 = f43
+        self.X43 = RiemannSurface(f43)
+        _ = self.X43.discriminant_points
+
+    def test_monodromy_path_construction(self):
+        # is tests, these paths caused some problems
+        X = self.X43
+        b = X.discriminant_points
+        gamma = X.path_factory.monodromy_path(b[2])
+        gamma = X.path_factory.monodromy_path(b[5])
+

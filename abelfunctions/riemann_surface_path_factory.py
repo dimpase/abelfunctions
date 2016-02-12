@@ -408,9 +408,7 @@ class RiemannSurfacePathFactory(object):
         branch_points = []
         permutations = []
         for bi in self.discriminant_points:
-            # create the monodromy path
-            gamma_x = self.complex_path_factory.complex_path_monodromy_path(bi)
-            gamma = self.RiemannSurfacePath_from_complex_path(gamma_x, x0, y0)
+            gamma = self.monodromy_path(bi)
 
             # compute the end fibre and the corresponding permutation
             yend = array(gamma.get_y(1.0), dtype=complex)
@@ -427,17 +425,18 @@ class RiemannSurfacePathFactory(object):
         gamma = self.RiemannSurfacePath_from_complex_path(gamma_x, x0, y0)
         yend = array(gamma.get_y(1.0), dtype=complex)
         phi_oo = matching_permutation(y0, yend)
+
+        # sanity check: the product of the finite branch point permutations
+        # should be equal to the inverse of the permutation at infinity
+        phi_prod = reduce(lambda phi1,phi2: phi2*phi1, permutations)
+        phi_prod_all = phi_prod * phi_oo
+        if not phi_prod_all.is_identity():
+            raise ValueError('Contradictory permutation at infinity.')
+
+        # add infinity if it's a branch point
         if not phi_oo.is_identity():
-            # sanity check: the product of the finite branch point
-            # permutations should be equal to the inverse of the
-            # permutation at infinity
-            phi_prod = reduce(lambda phi1,phi2: phi2*phi1, permutations)
-            phi_prod = phi_prod * phi_oo
-            if phi_prod.is_identity():
-                branch_points.append(infinity)
-                permutations.append(phi_oo)
-            else:
-                raise ValueError('Contradictory permutation at infinity.')
+            branch_points.append(infinity)
+            permutations.append(phi_oo)
 
         return branch_points, permutations
 

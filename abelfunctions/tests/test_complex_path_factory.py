@@ -256,3 +256,52 @@ class TestConstruction(unittest.TestCase):
         self.assertAlmostEqual(gamma(0), CPF.base_point)
         self.assertAlmostEqual(gamma(1.0), CPF.base_point)
 
+    def test_avoiding_path(self):
+        CPF = ComplexPathFactory(self.f1, base_point=-2, kappa=1)
+        b = CPF.discriminant_points[0]
+        R = CPF.radius(b)
+        self.assertAlmostEqual(R, 1.0)
+
+        # straight line path from (-2,1) to (1,-2). this intersects the circle
+        # of radius 1 about the origin at (-1,0) goes around to (0,-1).
+        #
+        # this test goes below the circle
+        z0 = -2 + 1.j
+        z1 = 1 - 2.j
+        gamma = CPF.complex_path_build_avoiding_path(z0,z1)
+        segments = gamma.segments
+        self.assertEqual(segments[0], ComplexLine(z0,-1))
+        self.assertEqual(segments[1], ComplexArc(1,0,-pi,pi/2))
+        self.assertEqual(segments[2], ComplexLine(-1.j,z1))
+
+        # straight line path from (-1,2) to (2,-1). this intersects the circle
+        # of radius 1 about the origin at (0,1) goes around to (1,0).
+        #
+        # this test goes below the circle
+        z0 = -1 + 2.j
+        z1 = 2 - 1.j
+        gamma = CPF.complex_path_build_avoiding_path(z0, z1)
+        segments = gamma.segments
+        self.assertEqual(segments[0], ComplexLine(z0,1.j))
+        self.assertEqual(segments[1], ComplexArc(1,0,pi/2,-pi/2))
+        self.assertEqual(segments[2], ComplexLine(1,z1))
+
+    def test_intersection_points_and_avoiding_arc(self):
+        CPF = ComplexPathFactory(self.f1, base_point=-2, kappa=1)
+        b = CPF.discriminant_points[0]
+        R = CPF.radius(b)
+        self.assertAlmostEqual(R, 1.0)
+
+        # straight line path from (-2,1) to (1,-2). this intersects the circle
+        # of radius 1 about the origin at (-1,0) goes around to (0,-1).
+        z0 = -2 + 1.j
+        z1 = 1 - 2.j
+        w0,w1 = CPF._intersection_points(z0, z1, b, R)
+        self.assertAlmostEqual(w0, -1)
+        self.assertAlmostEqual(w1, -1.j)
+
+        arc = CPF._avoiding_arc(w0, w1, b, R)
+        self.assertAlmostEqual(arc.R, 1)
+        self.assertAlmostEqual(arc.w, 0)
+        self.assertAlmostEqual(arc.theta, pi)
+        self.assertAlmostEqual(arc.dtheta, pi/2)

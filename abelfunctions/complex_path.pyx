@@ -66,7 +66,7 @@ cdef class ComplexPathPrimitive:
         # assert that the path is continuous
         self_end = self(1.0)
         other_start = other(0.0)
-        eps = 1e-14
+        eps = 1e-12
         if abs(self_end - other_start) > eps:
             raise ValueError('Cannot form sum of complex paths: ending point '
                              'of left does not match start point of right.')
@@ -154,10 +154,10 @@ cdef class ComplexPath(ComplexPathPrimitive):
         cdef ComplexPathPrimitive[:] args = numpy.array(
             segments, dtype=ComplexPathPrimitive)
         n = len(segments)
-        eps = 1e-14
+        eps = 1e-12
         for k in range(n-1):
-            gamma0 = args[0]
-            gamma1 = args[1]
+            gamma0 = segments[k]
+            gamma1 = segments[k+1]
             if abs(gamma1(0.0) - gamma0(1.0)) > eps:
                 raise ValueError('Segments must form continuous path.')
 
@@ -245,7 +245,7 @@ cdef class ComplexPath(ComplexPathPrimitive):
         -------
         gamma : ComplexPath
         """
-        reversed_segments = [segment.reverse() for segment in self[::-1]]
+        reversed_segments = [s.reverse() for s in self.segments[::-1]]
         gamma = ComplexPath(reversed_segments)
         return gamma
 
