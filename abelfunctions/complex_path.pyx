@@ -1,3 +1,7 @@
+# cython: boundscheck=False
+# cython: wraparound=False
+# cython: cdivision=False
+
 r"""Complex Paths :mod:`abelfunctions.complex_path`
 
 Data structures for paths in the complex plane.
@@ -42,11 +46,11 @@ cdef class ComplexPathPrimitive:
     # overload these in subclass #
     ##############################
     def __init__(self, *args, **kwds):
-        raise NotImplementedError()
+        self._nsegments = 1
 
     def __repr__(self):
         start_point = self[0](0.0)
-        end_point = self[-1](1.0)
+        end_point = self[self._nsegments-1](1.0)
         s = 'Complex path from %s to %s'%(start_point, end_point)
         return s
 
@@ -150,6 +154,8 @@ cdef class ComplexPath(ComplexPathPrimitive):
         *args : list
             A list of :class:`ComplexPathPrimitive`s.
         """
+        ComplexPathPrimitive.__init__(self)
+
         # assert that the segments form a continuous path
         cdef ComplexPathPrimitive[:] args = numpy.array(
             segments, dtype=ComplexPathPrimitive)
@@ -295,6 +301,7 @@ cdef class ComplexLine(ComplexPathPrimitive):
         return self._x1
 
     def __init__(self, complex x0, complex x1):
+        ComplexPathPrimitive.__init__(self)
         self._x0 = x0
         self._x1 = x1
 
@@ -354,6 +361,7 @@ cdef class ComplexArc(ComplexPathPrimitive):
         return self._dtheta
 
     def __init__(self, double R, complex w, double theta, double dtheta):
+        ComplexPathPrimitive.__init__(self)
         self._R = R
         self._w = w
         self._theta = theta
@@ -399,6 +407,7 @@ cdef class ComplexRay(ComplexPathPrimitive):
         return self._x0
 
     def __init__(self, complex x0):
+        ComplexPathPrimitive.__init__(self)
         if cabs(x0) < 1e-8:
             raise ValueError('Complex rays must start away from the origin.')
         self._x0 = x0

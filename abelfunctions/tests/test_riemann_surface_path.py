@@ -13,9 +13,6 @@ from abelfunctions.puiseux import puiseux
 from abelfunctions.riemann_surface import RiemannSurface
 from abelfunctions.riemann_surface_path import(
     ordered_puiseux_series,
-    smale_alpha,
-    smale_beta,
-    smale_gamma,
     RiemannSurfacePathPuiseux,
     RiemannSurfacePathSmale,
 )
