@@ -252,7 +252,7 @@ cdef class RiemannSurfacePathPrimitive:
             `self._scheckpoints[k+1] > t`.
         """
         cdef double si
-        cdef int index
+        cdef int index, k
         cdef int n = self._ncheckpoints
         if s == 1.0:
             return n-1
