@@ -1,6 +1,7 @@
-# cython: boundscheck=False
-# cython: wraparound=False
-# cython: cdivision=False
+#!python
+#cython: boundscheck=False
+#cython: wraparound=False
+#cython: cdivision=False
 
 r"""Complex Paths :mod:`abelfunctions.complex_path`
 

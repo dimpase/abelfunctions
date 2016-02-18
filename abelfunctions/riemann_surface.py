@@ -202,9 +202,10 @@ class RiemannSurface(object):
 
         Returns
         -------
-        None
+        plt : sage plot
         """
-        self.path_factory.show_paths(*args, **kwds)
+        plt = self.path_factory.show_paths(*args, **kwds)
+        return plt
 
     # Monodromy: expose some methods / properties of self.Monodromy without
     # subclassing (since it doesn't make sense that a Riemann surface is a type
