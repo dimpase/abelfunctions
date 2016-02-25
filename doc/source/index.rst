@@ -31,5 +31,4 @@ Contents
    applications/index.rst
    reference/index.rst
    develop/index.rst
-   changelog
    authors
