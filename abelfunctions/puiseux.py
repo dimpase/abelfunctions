@@ -857,7 +857,7 @@ class PuiseuxTSeries(object):
             # if neither order or nterms is given, just call add_term
             self.add_term()
 
-    def extend_to_t(self, t, curve_tol=1e-8, rel_tol=1e-4):
+    def extend_to_t(self, t, curve_tol=1e-8):
         r"""Extend the series to accurately determine the y-values at `t`.
 
         Add terms to the t-series until the the regular place
@@ -870,10 +870,6 @@ class PuiseuxTSeries(object):
         eps : double
         curve_tol : double
             The tolerance for the corresponding point to lie on the curve.
-        rel_tol : double
-            A relative tolerance parameter used to ensure that the point
-            :math:`(x(t_0),y(t_0))` is on the same branch as the center
-            of the Puiseux series.
 
         Returns
         -------
@@ -885,35 +881,20 @@ class PuiseuxTSeries(object):
         This doesn't work well in the infinite case. (Puiseux series centered
         at x=oo.)
         """
-        # note that we need to keep track of how much the y-value changes with
-        # each iteration just in case it is intersecting with a different
-        # branch of the curve. to do this we need at least one non-zero term
-        self.extend(nterms=1)
-
         num_iter = 0
         max_iter = 16
-        yprev = infinity
         while num_iter < max_iter:
             xt = self.eval_x(t)
             yt = self.eval_y(t)
             n,a = max(self.terms)
             curve_error = abs(self.f(xt,yt))
-
-            # XXX hack for the infinity case: don't use relative error
-            if self.x0 == infinity:
-                rel_error = 0.0
-            else:
-                rel_error = abs(a*t**n/yt) if yt else 0.0
-
-            # break if both tolerances are satisfied. otherwise, add a term
-            if (curve_error < curve_tol) and (rel_error < rel_tol):
+            if (curve_error < curve_tol):
                 break
+            else:
+                self.add_term()
+                num_iter += 1
 
-            self.add_term()
-            num_iter += 1
-            yprev = yt
-
-    def extend_to_x(self, x, curve_tol=1e-8, rel_tol=1e-2):
+    def extend_to_x(self, x, curve_tol=1e-8):
         r"""Extend the series to accurately determine the y-values at `x`.
 
         Add terms to the t-series until the the regular place :math:`(x,
@@ -925,21 +906,17 @@ class PuiseuxTSeries(object):
         x : complex
         curve_tol : double
             The tolerance for the corresponding point to lie on the curve.
-        rel_tol : double
-            A relative tolerance parameter used to ensure that the point
-            :math:`(x(t_0),y(t_0))` is on the same branch as the center
-            of the Puiseux series.
 
         Returns
         -------
         none
             The PuiseuxTSeries is modified in-place.
         """
-        # simply convert to t and pass to extend. choose any conjugate
-        # since the convergence rates between each conjugate is equal
+        # simply convert to t and pass to extend. choose any conjugate since
+        # the convergence rates between each conjugate is equal
         center, xcoefficient, ramification_index = self.xdata
         t = numpy.power((x-center)/xcoefficient, 1.0/ramification_index)
-        self.extend_to_t(t, curve_tol=curve_tol, rel_tol=rel_tol)
+        self.extend_to_t(t, curve_tol=curve_tol)
 
     def eval_x(self, t):
         r"""Evaluate the x-part of the Puiseux series at `t`.

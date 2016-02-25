@@ -28,8 +28,13 @@ from distutils.extension import Extension
 from Cython.Distutils import build_ext
 
 # include every conceivable directory that may contains sage headers
-SAGE_ROOT = os.environ['SAGE_ROOT']
-SAGE_LOCAL = os.environ['SAGE_LOCAL']
+try:
+    SAGE_ROOT = os.environ['SAGE_ROOT']
+    SAGE_LOCAL = os.environ['SAGE_LOCAL']
+except KeyError:
+    raise EnvironmentError('abelfunctions must be built using Sage:\n\n'
+                           '\t$ sage setup.py <args> <kwds>\n')
+
 INCLUDES = [os.path.join(SAGE_ROOT),
             os.path.join(SAGE_ROOT,'src'),
             os.path.join(SAGE_ROOT,'src','sage'),
@@ -41,6 +46,18 @@ INCLUDES_NUMPY = [os.path.join(SAGE_LOCAL,'lib','python','site-packages',
                                'numpy','core','include')]
 
 ext_modules = [
+    Extension('abelfunctions.complex_path',
+              sources=[
+                  os.path.join('abelfunctions',
+                               'complex_path.pyx')],
+              extra_compile_args = ['-std=c99'],
+          ),
+    Extension('abelfunctions.riemann_surface_path',
+              sources=[
+                  os.path.join('abelfunctions',
+                               'riemann_surface_path.pyx')],
+              extra_compile_args = ['-std=c99'],
+          ),
     Extension('abelfunctions.puiseux_series_ring_element',
               sources=[
                   os.path.join('abelfunctions',
