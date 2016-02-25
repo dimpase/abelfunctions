@@ -384,7 +384,8 @@ class Differential:
         -------
         list
         """
-        f = self.RS.f
+        # we need to work over QQbar anyway
+        f = self.RS.f.change_ring(QQbar)
         R = f.parent()
         x,y = R.gens()
 
@@ -398,14 +399,14 @@ class Differential:
         # denominator is dfdy these are simply the discriminant points
         denom = self.differential.denominator()
         if denom == f.derivative(y):
-            denom_roots = self.RS.discriminant_points()
+            denom_roots = self.RS.discriminant_points
         else:
             res = f.resultant(denom,y).univariate_polynomial()
             denom_roots = res.roots(ring=QQbar, multiplicities=False)
 
         # finally, the possible x-points contributed by dx are the discriminant
         # points of the curve
-        discriminant_points = self.RS.discriminant_points()
+        discriminant_points = self.RS.discriminant_points
 
         # form the set of x-values over which to compute places. reorder
         # entries such that x=0 and x=oo appear first because differential

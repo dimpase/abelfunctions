@@ -106,23 +106,23 @@ class TestConstruction(unittest.TestCase):
             CPF = ComplexPathFactory(f, -1.25, kappa=0.5)
         CPF = ComplexPathFactory(f, -1.5, kappa=0.5)
 
-    def test_complex_path_to_discriminant_point(self):
+    def test_path_to_discriminant_point(self):
         #
         f = self.f1
         CPF = ComplexPathFactory(f, -2, kappa=1.0)
-        path = CPF.complex_path_to_discriminant_point(0)
+        path = CPF.path_to_discriminant_point(0)
         self.assertEqual(path, ComplexLine(-2,-1))
 
         #
         f = self.f2
         CPF = ComplexPathFactory(f, -1, kappa=1.0)
-        path = CPF.complex_path_to_discriminant_point(-1.j)
+        path = CPF.path_to_discriminant_point(-1.j)
 
         z = -sqrt(2.0)/2.0 - (1-sqrt(2.0)/2.0)*1.j
         w = path(1.0)
         self.assertAlmostEqual(z,w)
 
-        path = CPF.complex_path_to_discriminant_point(1.j)
+        path = CPF.path_to_discriminant_point(1.j)
         z = z.conjugate()
         w = path(1.0)
         self.assertAlmostEqual(z,w)
@@ -131,19 +131,19 @@ class TestConstruction(unittest.TestCase):
         # kappa = 0.5 ==> radius = sqrt(2)/4.0
         f = self.f3
         CPF = ComplexPathFactory(f, -2, kappa=0.5)
-        path = CPF.complex_path_to_discriminant_point(-1.j)
+        path = CPF.path_to_discriminant_point(-1.j)
 
         alpha = 1.0-sqrt(10.0)/20.0
         z = (2*alpha-2) - alpha*1.0j
         w = path(1.0)
         self.assertAlmostEqual(z,w)
 
-        path = CPF.complex_path_to_discriminant_point(1.j)
+        path = CPF.path_to_discriminant_point(1.j)
         z = z.conjugate()
         w = path(1.0)
         self.assertAlmostEqual(z,w)
 
-    def test_complex_path_to_discriminant_point_abel_ordering(self):
+    def test_path_to_discriminant_point_abel_ordering(self):
         # the way abel complex paths are constructed ensure that all points
         # along the path to bi lie above all discriminant points below bi and
         # above all discriminant points below bi. this will test that scenario
@@ -157,26 +157,26 @@ class TestConstruction(unittest.TestCase):
         # along the path all lie above the other discriminant point
         #
         # ignore the base point in these tests
-        path = CPF.complex_path_to_discriminant_point(1.j)
+        path = CPF.path_to_discriminant_point(1.j)
         s = numpy.linspace(0,1,32)
         path_points = path(s)
         centered_path_points = path_points - CPF.base_point
 
-        centered_b0 = complex(CPF.discriminant_points[0] - CPF.base_point)
+        centered_b0 = CPF.discriminant_points_complex[0] - CPF.base_point
         b0_angles = numpy.angle(centered_path_points - centered_b0)
         self.assertTrue(all(b0_angles[1:] >= 0))
 
-        centered_b1 = complex(CPF.discriminant_points[1] - CPF.base_point)
+        centered_b1 = CPF.discriminant_points_complex[1] - CPF.base_point
         b1_angles = numpy.angle(centered_path_points - centered_b1)
         self.assertTrue(all(b1_angles[1:] >= 0))
 
-        centered_b2 = complex(CPF.discriminant_points[2] - CPF.base_point)
+        centered_b2 = CPF.discriminant_points_complex[2] - CPF.base_point
         b2_angles = numpy.angle(centered_path_points - centered_b2)
         self.assertTrue(all(b2_angles[1:] >= 0))
 
         # -1.j lies below all other discriminant points. make sure the points
         # along the path all lie below the other discriminant point
-        path = CPF.complex_path_to_discriminant_point(-1.j)
+        path = CPF.path_to_discriminant_point(-1.j)
         s = numpy.linspace(0,1,32)
         path_points = path(s)
         centered_path_points = path_points - CPF.base_point
@@ -187,7 +187,7 @@ class TestConstruction(unittest.TestCase):
         b2_angles = numpy.angle(centered_path_points - centered_b2)
         self.assertTrue(all(b2_angles[1:] <= 0))
 
-        centered_b3 = complex(CPF.discriminant_points[3] - CPF.base_point)
+        centered_b3 = CPF.discriminant_points_complex[3] - CPF.base_point
         b3_angles = numpy.angle(centered_path_points - centered_b3)
         self.assertTrue(all(b3_angles[1:] <= 0))
 
@@ -249,14 +249,14 @@ class TestConstruction(unittest.TestCase):
         b = CPF.closest_discriminant_point(-2 + 2.1j)
         self.assertEqual(b, discriminant_points[3])
 
-    def test_complex_path_around_infinity(self):
+    def test_monodromy_path_infinity(self):
         f = self.f3
         CPF = ComplexPathFactory(f, -3, kappa=0.5)
-        gamma = CPF.complex_path_around_infinity()
+        gamma = CPF.monodromy_path_infinity()
         self.assertAlmostEqual(gamma(0), CPF.base_point)
         self.assertAlmostEqual(gamma(1.0), CPF.base_point)
 
-    def test_avoiding_path(self):
+    def test_path(self):
         CPF = ComplexPathFactory(self.f1, base_point=-2, kappa=1)
         b = CPF.discriminant_points[0]
         R = CPF.radius(b)
@@ -268,7 +268,7 @@ class TestConstruction(unittest.TestCase):
         # this test goes below the circle
         z0 = -2 + 1.j
         z1 = 1 - 2.j
-        gamma = CPF.complex_path_build_avoiding_path(z0,z1)
+        gamma = CPF.path(z0, z1)
         segments = gamma.segments
         self.assertEqual(segments[0], ComplexLine(z0,-1))
         self.assertEqual(segments[1], ComplexArc(1,0,-pi,pi/2))
@@ -280,7 +280,7 @@ class TestConstruction(unittest.TestCase):
         # this test goes below the circle
         z0 = -1 + 2.j
         z1 = 2 - 1.j
-        gamma = CPF.complex_path_build_avoiding_path(z0, z1)
+        gamma = CPF.path(z0, z1)
         segments = gamma.segments
         self.assertEqual(segments[0], ComplexLine(z0,1.j))
         self.assertEqual(segments[1], ComplexArc(1,0,pi/2,-pi/2))
@@ -296,11 +296,11 @@ class TestConstruction(unittest.TestCase):
         # of radius 1 about the origin at (-1,0) goes around to (0,-1).
         z0 = -2 + 1.j
         z1 = 1 - 2.j
-        w0,w1 = CPF._intersection_points(z0, z1, b, R)
+        w0,w1 = CPF.intersection_points(z0, z1, b, R)
         self.assertAlmostEqual(w0, -1)
         self.assertAlmostEqual(w1, -1.j)
 
-        arc = CPF._avoiding_arc(w0, w1, b, R)
+        arc = CPF.avoiding_arc(w0, w1, b, R)
         self.assertAlmostEqual(arc.R, 1)
         self.assertAlmostEqual(arc.w, 0)
         self.assertAlmostEqual(arc.theta, pi)

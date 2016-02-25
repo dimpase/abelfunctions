@@ -260,7 +260,7 @@ class TestMonodromyPath(unittest.TestCase):
     def test_monodromy_path(self):
         PF = RiemannSurfacePathFactory(self.X1, base_point=-2,
                                        base_sheets=[-1.j*sqrt(2),1.j*sqrt(2)])
-        gamma_x = PF.complex_path_factory.complex_path_monodromy_path(0)
+        gamma_x = PF.complex_path_factory.monodromy_path(0)
         gamma = PF.RiemannSurfacePath_from_complex_path(gamma_x)
         radius = PF.complex_path_factory.radius(0)
         self.assertAlmostEqual(gamma.get_x(0.0), -2)
@@ -274,7 +274,7 @@ class TestMonodromyPath(unittest.TestCase):
 
         PF = RiemannSurfacePathFactory(self.X2, base_point=-2,
                                        base_sheets=[-sqrt(5),sqrt(5)])
-        gamma_x = PF.complex_path_factory.complex_path_monodromy_path(-I)
+        gamma_x = PF.complex_path_factory.monodromy_path(-I)
         gamma = PF.RiemannSurfacePath_from_complex_path(gamma_x)
         self.assertAlmostEqual(gamma.get_x(0.0), -2)
         self.assertAlmostEqual(gamma.get_x(1.0), -2)

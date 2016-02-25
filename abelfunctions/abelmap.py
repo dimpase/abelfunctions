@@ -381,7 +381,7 @@ class AbelMap_Function(object):
         """
         X = P.RS
         genus = X.genus()
-        if P == X.base_place():
+        if P == X.base_place:
             value = numpy.zeros(genus, dtype=numpy.complex)
         else:
             gamma = X.path(P)

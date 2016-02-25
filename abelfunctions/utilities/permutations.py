@@ -119,9 +119,6 @@ class Permutation(object):
 
         return cycles
 
-    def __str__(self):
-        return str(self._cycles)
-
     def __repr__(self):
         non_identity_cycles = [c for c in self._cycles if len(c) > 1]
         return str(non_identity_cycles)

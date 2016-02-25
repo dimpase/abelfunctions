@@ -495,7 +495,7 @@ cdef class RiemannSurfacePath(RiemannSurfacePathPrimitive):
 
     @property
     def segments(self):
-        return self._segments
+        return numpy.asarray(self._segments).tolist()
 
     def __init__(self, riemann_surface, complex_path, y0, segments):
         r"""Directly instantiate a RiemannSurfacePath from a Riemann surface and a list
@@ -923,8 +923,8 @@ cdef class RiemannSurfacePathPuiseux(RiemannSurfacePathPrimitive):
 
         # extract relevant information about the Puiseux series
         p = P.puiseux_series
-        x0 = complex(self.gamma.x0)
-        y0 = complex(self.gamma.y0[0])
+        x0 = complex(self._x0)
+        y0 = complex(self._y0[0])
         alpha = 0 if self.target_point == infinity else self.target_point
         xcoefficient = complex(p.xcoefficient)
         e = numpy.int(p.ramification_index)
@@ -1125,7 +1125,7 @@ cdef class RiemannSurfacePathSmale(RiemannSurfacePathPrimitive):
     def df(self):
         return self._df
 
-    def __init__(self, riemann_surface, complex_path, y0, ncheckpoints=16):
+    def __init__(self, riemann_surface, complex_path, y0, ncheckpoints=32):
         # store a list of all y-derivatives of f (including the zeroth deriv)
         #
         # it is very important that the domain of the fast_callable versions of
@@ -1176,7 +1176,7 @@ cdef class RiemannSurfacePathSmale(RiemannSurfacePathPrimitive):
                 yik = yi[k]
                 betaik = smale_beta(self._df, xip1, yik)
                 distancejk = cabs(yij-yik)
-                if distancejk < 2*(betaij + betaik):
+                if distancejk < 2.5*(betaij + betaik):  # 2*beta
                     # approximate solutions don't lead to distinct roots.
                     # refine the step by analytically continuing to an
                     # intermedite time

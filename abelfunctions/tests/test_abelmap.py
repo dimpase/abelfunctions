@@ -15,7 +15,7 @@ class TestDivisors(AbelfunctionsTestCase):
         self.X11_P = self.X11(0)[0]
         self.X11_Q = self.X11(1)[0]
         self.X11_R = self.X11(I)[0]
-        self.X11_P0 = self.X11.base_place()
+        self.X11_P0 = self.X11.base_place
 
     def test_divisors_X11(self):
         J = self.X11_Jacobian

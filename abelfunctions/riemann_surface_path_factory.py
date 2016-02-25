@@ -47,7 +47,7 @@ from abelfunctions.complex_path_factory import ComplexPathFactory
 from abelfunctions.ypath_factory import YPathFactory as Skeleton
 
 from numpy import complex, double, array
-from sage.all import infinity, CC, cached_method
+from sage.all import infinity, CC, CDF, cached_method
 
 class RiemannSurfacePathFactory(object):
     r"""Factory class for constructing paths on the Riemann surface.
@@ -56,7 +56,7 @@ class RiemannSurfacePathFactory(object):
     ----------
     RS : RiemannSurface
         The Riemann surface.
-    complex_path_factory : XPathFactory
+    complex_path_factory : ComplexPathFactory
         A factory object for determining how to navigate the complex
         x-plane. How to construct paths avoiding, encircling, and
         approaching discriminant points.
@@ -162,7 +162,7 @@ class RiemannSurfacePathFactory(object):
         if not base_sheets:
             x,y = self.riemann_surface.f.parent().gens()
             p = self.riemann_surface.f(self.base_point, y).univariate_polynomial()
-            roots = p.roots(CC, multiplicities=False)
+            roots = p.roots(CDF, multiplicities=False)
             base_sheets = numpy.array(roots, dtype=numpy.complex)
         else:
             f = self.riemann_surface.f
@@ -348,15 +348,15 @@ class RiemannSurfacePathFactory(object):
         # construct the reverse path from the place to the base x-point in
         # order to determine which sheet the place is on
         P0 = self.base_place
-        gamma_x = self.complex_path_factory.complex_path_to_point(P0.x, P.x)
-        gamma = self.RiemannSurfacePath_from_complex_path(gamma_X)
+        gamma_x = self.complex_path_factory.path(P0.x, P.x)
+        gamma = self.RiemannSurfacePath_from_complex_path(gamma_x)
 
         # determine the index of the sheet (sheet_index) of the base place
         # continues to the y-component of the target
-        base_sheets = self.base_sheets()
+        base_sheets = self.base_sheets
         end_sheets = array(gamma.get_y(1.0), dtype=complex)
         end_diffs = abs(end_sheets - complex(P.y))
-        if numpy.min(end_diffs) > 1.0e-8:
+        if min(end_diffs) > 1.0e-8:
             raise ValueError('Error in constructing Abel path: end of regular '
                              'path does not match with target place.')
         sheet_index = numpy.argmin(end_diffs)
@@ -373,7 +373,7 @@ class RiemannSurfacePathFactory(object):
             # path to the target place. there is an inherent check that
             # the y-values above the base point match
             gamma_rest = self.RiemannSurfacePath_from_complex_path(
-                xpath_to_target, y0=ordered_base_sheets)
+                gamma_x, y0=ordered_base_sheets)
             gamma = gamma_swap + gamma_rest
 
         # sanity check
@@ -421,7 +421,7 @@ class RiemannSurfacePathFactory(object):
                 permutations.append(phi)
 
         # compute the monodromy element of the point at infinity
-        gamma_x = self.complex_path_factory.complex_path_around_infinity()
+        gamma_x = self.complex_path_factory.monodromy_path_infinity()
         gamma = self.RiemannSurfacePath_from_complex_path(gamma_x, x0, y0)
         yend = array(gamma.get_y(1.0), dtype=complex)
         phi_oo = matching_permutation(y0, yend)
@@ -456,8 +456,8 @@ class RiemannSurfacePathFactory(object):
             The path encircling the branch point `bi`.
 
         """
-        xpath = self.complex_path_factory.complex_path_monodromy_path(bi, nrots=nrots)
-        gamma = self.RiemannSurfacePath_from_complex_path(xpath)
+        gammax = self.complex_path_factory.monodromy_path(bi, nrots=nrots)
+        gamma = self.RiemannSurfacePath_from_complex_path(gammax)
         return gamma
 
     def a_cycles(self):
@@ -536,8 +536,7 @@ class RiemannSurfacePathFactory(object):
         """
         segments = []
         for bi, nrots in cycle:
-            gammax_i = self.complex_path_factory.complex_path_monodromy_path(
-                bi, nrots=nrots)
+            gammax_i = self.complex_path_factory.monodromy_path(bi, nrots=nrots)
             segments.extend(gammax_i.segments)
 
         gammax = ComplexPath(segments)
@@ -549,11 +548,11 @@ class RiemannSurfacePathFactory(object):
 
         Parameters
         ----------
-        xpath : list
-            A list of tuples defining the xpath.
-        x0 : complex (default `self.base_point()`)
+        complex_path : ComplexPath
+            A complex path.
+        x0 : complex (default `self.base_point`)
             The starting x-point of the path.
-        y0 : complex list (default `self.base_sheets()`)
+        y0 : complex list (default `self.base_sheets`)
             The starting ordering of the y-sheets.
 
         Returns
@@ -567,10 +566,20 @@ class RiemannSurfacePathFactory(object):
         if y0 is None:
             y0 = self.base_sheets
 
-        # build a list of path segments from each tuple of xdata. build a line
-        # segment or arc depending on xdata input
+        # coerce and assert that x0,y0 lies on the path and curve
         x0 = complex(x0)
         y0 = array(y0, dtype=complex)
+        if abs(x0 - complex_path(0)) > 1e-7:
+            raise ValueError('The point %s is not at the start of the '
+                             'ComplexPath %s'%(x0, complex_path))
+        f = self.riemann_surface.f
+        curve_error = [abs(complex(f(x0,y0k))) for y0k in y0]
+        if max(curve_error) > 1e-7:
+            raise ValueError('The fibre %s above %s does not lie on the '
+                             'curve %s'%(y0.tolist(), x0, f))
+
+        # build a list of path segments from each tuple of xdata. build a line
+        # segment or arc depending on xdata input
         x0_segment = x0
         y0_segment = y0
         segments = []
